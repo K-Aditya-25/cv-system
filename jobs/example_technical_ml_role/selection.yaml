@@ -1,0 +1,62 @@
+education:
+  - university_bsc_computer_engineering
+
+experience:
+  - id: ml_research_assistant_datainsight_lab
+    bullets:
+      - model_evaluation_pipeline
+      - feature_quality_checks
+      - experiment_documentation
+  - id: software_engineering_intern_examplecorp
+    bullets:
+      - api_performance_optimization
+      - automated_testing
+
+projects:
+  - id: ml_model_monitoring_dashboard
+    bullets:
+      - drift_detection
+      - evaluation_visualization
+  - id: distributed_file_storage
+    bullets:
+      - replication_fault_tolerance
+      - grpc_communication
+
+skills:
+  programming_languages:
+    - Python
+    - Java
+    - C++
+    - SQL
+  machine_learning:
+    - PyTorch
+    - scikit-learn
+    - Model evaluation
+    - Feature engineering
+  data:
+    - Pandas
+    - NumPy
+    - Statistical analysis
+  cloud_devops:
+    - Docker
+    - GitHub Actions
+    - AWS
+    - MLflow
+  concepts:
+    - Testing
+    - CI/CD
+    - MLOps
+    - Data pipelines
+
+volunteering: []
+leadership: []
+
+achievements:
+  - dean_list_2025
+  - hackathon_best_ml_project
+
+certifications:
+  - aws_cloud_practitioner
+  - datacamp_ml_scientist
+
+custom_sections: {}

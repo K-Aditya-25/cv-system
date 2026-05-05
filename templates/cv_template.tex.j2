@@ -1,0 +1,187 @@
+{% raw %}
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[margin=0.55in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{tabularx}
+\usepackage{array}
+
+\definecolor{AccentBlue}{HTML}{1F4E79}
+\hypersetup{
+  colorlinks=true,
+  urlcolor=AccentBlue,
+  linkcolor=AccentBlue
+}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\setlist[itemize]{leftmargin=1.15em, itemsep=1pt, topsep=2pt, parsep=0pt, partopsep=0pt}
+\renewcommand{\labelitemi}{\textbullet}
+
+\newcommand{\cvsection}[1]{%
+  \vspace{6pt}%
+  {\large\bfseries\color{AccentBlue} #1}\\[-2pt]%
+  {\color{AccentBlue}\hrule height 0.45pt}%
+  \vspace{3pt}%
+}
+\newcommand{\cvrow}[2]{%
+  \begin{tabularx}{\linewidth}{@{}X>{\raggedleft\arraybackslash}p{0.30\linewidth}@{}}
+    #1 & #2
+  \end{tabularx}
+}
+\newcommand{\cventryspace}{\vspace{2pt}}
+
+\begin{document}
+{% endraw %}
+
+\begin{center}
+  {\LARGE\bfseries {{ profile.name | tex }}}\\[3pt]
+  \small
+  {%- set contacts = [] -%}
+  {%- if profile.email -%}{%- set _ = contacts.append('\\href{mailto:' ~ (profile.email | tex_url) ~ '}{' ~ (profile.email | tex) ~ '}') -%}{%- endif -%}
+  {%- if profile.phone -%}{%- set _ = contacts.append(profile.phone | tex) -%}{%- endif -%}
+  {%- if profile.location -%}{%- set _ = contacts.append(profile.location | tex) -%}{%- endif -%}
+  {%- if profile.github -%}{%- set _ = contacts.append('\\href{\\detokenize{' ~ (profile.github | tex_url) ~ '}}{GitHub}') -%}{%- endif -%}
+  {%- if profile.linkedin -%}{%- set _ = contacts.append('\\href{\\detokenize{' ~ (profile.linkedin | tex_url) ~ '}}{LinkedIn}') -%}{%- endif -%}
+  {%- if profile.portfolio -%}{%- set _ = contacts.append('\\href{\\detokenize{' ~ (profile.portfolio | tex_url) ~ '}}{Portfolio}') -%}{%- endif -%}
+  {%- if profile.blog -%}{%- set _ = contacts.append('\\href{\\detokenize{' ~ (profile.blog | tex_url) ~ '}}{Blog}') -%}{%- endif -%}
+  {%- if profile.kaggle -%}{%- set _ = contacts.append('\\href{\\detokenize{' ~ (profile.kaggle | tex_url) ~ '}}{Kaggle}') -%}{%- endif -%}
+  {%- if profile.devpost -%}{%- set _ = contacts.append('\\href{\\detokenize{' ~ (profile.devpost | tex_url) ~ '}}{Devpost}') -%}{%- endif -%}
+  {%- for link in profile.extra_links -%}
+    {%- set _ = contacts.append('\\href{\\detokenize{' ~ (link.url | tex_url) ~ '}}{' ~ (link.label | tex) ~ '}') -%}
+  {%- endfor -%}
+  {{ contacts | join(' $\\vert$ ') }}
+\end{center}
+
+{% for section_key in sections_order %}
+{% if section_key == "profile" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+{{ profile.summary | tex }}
+
+{% elif section_key == "education" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+{% for item in education %}
+\cvrow{\textbf{ {{ item.institution | tex }} }}{ {{ [item.start_date, item.end_date] | select | join(' -- ') | tex }} }
+{% if item.degree or item.grade or item.location %}
+\cvrow{ {{ item.degree | tex }}{% if item.grade %}, {{ item.grade | tex }}{% endif %}}{ {{ item.location | tex }} }
+{% endif %}
+{% if item.coursework %}
+\textit{Relevant Coursework:} {{ item.coursework | map('tex') | join(', ') }}
+{% endif %}
+{% if item.bullets %}
+\begin{itemize}
+{% for bullet in item.bullets %}
+  \item {{ bullet.text | tex }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+\cventryspace
+{% endfor %}
+
+{% elif section_key in ["skills", "technical_skills"] %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+{% for category, values in skills.items() %}
+\textbf{ {{ category | category_label | tex }}:} {{ values | map('tex') | join(', ') }}{% if not loop.last %}\\[1pt]{% endif %}
+{% endfor %}
+
+{% elif section_key == "experience" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+{% for item in experience %}
+\cvrow{\textbf{ {{ item.title | tex }} }}{ {{ [item.start_date, item.end_date] | select | join(' -- ') | tex }} }
+\cvrow{ {{ item.company | tex }}{% if item.technologies %} \textbar{} \textit{ {{ item.technologies | map('tex') | join(', ') }} }{% endif %}}{ {{ item.location | tex }} }
+{% if item.bullets %}
+\begin{itemize}
+{% for bullet in item.bullets %}
+  \item {{ bullet.text | tex }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+\cventryspace
+{% endfor %}
+
+{% elif section_key == "projects" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+{% for item in projects %}
+{% set project_links = [] %}
+{% for link in item.links %}
+  {% set _ = project_links.append('\\href{\\detokenize{' ~ (link.url | tex_url) ~ '}}{' ~ (link.label | tex) ~ '}') %}
+{% endfor %}
+\cvrow{\textbf{ {{ item.name | tex }} }{% if project_links %} -- {{ project_links | join(' $\\vert$ ') }}{% endif %}}{ {{ item.date | tex }} }
+{% if item.subtitle or item.description or item.technologies %}
+\cvrow{ {% if item.subtitle %}{{ item.subtitle | tex }}{% elif item.description %}{{ item.description | tex }}{% endif %} }{ {% if item.technologies %}\textit{ {{ item.technologies | map('tex') | join(', ') }} }{% endif %} }
+{% endif %}
+{% if item.bullets %}
+\begin{itemize}
+{% for bullet in item.bullets %}
+  \item {{ bullet.text | tex }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+\cventryspace
+{% endfor %}
+
+{% elif section_key == "volunteering" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+{% for item in volunteering %}
+\cvrow{\textbf{ {{ item.role | tex }} }}{ {{ [item.start_date, item.end_date] | select | join(' -- ') | tex }} }
+\cvrow{ {{ item.organization | tex }} }{ {{ item.location | tex }} }
+{% if item.bullets %}
+\begin{itemize}
+{% for bullet in item.bullets %}
+  \item {{ bullet.text | tex }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+\cventryspace
+{% endfor %}
+
+{% elif section_key == "leadership" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+{% for item in leadership %}
+\cvrow{\textbf{ {{ item.role | tex }} }}{ {{ [item.start_date, item.end_date] | select | join(' -- ') | tex }} }
+\cvrow{ {{ item.organization | tex }} }{ {{ item.location | tex }} }
+{% if item.bullets %}
+\begin{itemize}
+{% for bullet in item.bullets %}
+  \item {{ bullet.text | tex }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+\cventryspace
+{% endfor %}
+
+{% elif section_key == "achievements" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+\begin{itemize}
+{% for item in achievements %}
+  \item \textbf{ {{ item.title | tex }} }{% if item.issuer %}, {{ item.issuer | tex }}{% endif %}{% if item.date %} ({{ item.date | tex }}){% endif %}: {{ item.description | tex }}
+{% endfor %}
+\end{itemize}
+
+{% elif section_key == "certifications" %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+\begin{itemize}
+{% for item in certifications %}
+  \item \textbf{ {{ item.name | tex }} }{% if item.issuer %}, {{ item.issuer | tex }}{% endif %}{% if item.date %} ({{ item.date | tex }}){% endif %}{% if item.credential_url %} -- \href{ {{ item.credential_url | href_url }} }{Credential}{% endif %}{{ "\n" }}
+{% endfor %}
+\end{itemize}
+
+{% elif section_key in custom_sections %}
+\cvsection{ {{ section_titles[section_key] | tex }} }
+\begin{itemize}
+{% for item in custom_sections[section_key]["items"] %}
+  \item {{ item.text | tex }}
+{% endfor %}
+\end{itemize}
+
+{% endif %}
+{% endfor %}
+
+\end{document}

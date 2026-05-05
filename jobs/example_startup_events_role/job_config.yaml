@@ -1,0 +1,15 @@
+company: "CommunityForge"
+role: "Startup Events & Technology Community Coordinator"
+location: "Dublin, Ireland"
+cv_length: "one_page"
+cv_variant: "startup_events"
+target_profile: "startup events/community technology"
+output_name: "communityforge_startup_events_cv"
+template: "cv_template.tex.j2"
+sections_order:
+  - profile
+  - education
+  - experience
+  - projects
+  - leadership_volunteering_outreach
+  - skills

@@ -1,0 +1,403 @@
+profile:
+  name: "Alex Example"
+  email: "alex.example@email.com"
+  phone: "+44 7700 900123"
+  location: "London, UK"
+  linkedin: "https://www.linkedin.com/in/alex-example"
+  github: "https://github.com/alex-example"
+  portfolio: "https://alexexample.dev"
+  blog: "https://blog.alexexample.dev"
+  kaggle: "https://www.kaggle.com/alexexample"
+  devpost: "https://devpost.com/alexexample"
+  summary: "Computer engineering student focused on machine learning systems, backend software, and practical technology communities."
+  extra_links:
+    - label: "Google Scholar"
+      url: "https://scholar.google.com/citations?user=example"
+
+education:
+  - id: university_bsc_computer_engineering
+    institution: "Northbridge University"
+    location: "London, UK"
+    degree: "BSc Computer Engineering"
+    start_date: "2023"
+    end_date: "2027"
+    grade: "First Class Honours expected"
+    coursework:
+      - Data Structures & Algorithms
+      - Machine Learning
+      - Distributed Systems
+      - Database Systems
+      - Probability & Statistics
+    bullets:
+      - id: dean_list_academic_performance
+        text: "Named to the Dean's List for strong academic performance across software engineering and mathematics modules."
+        tags:
+          - academic
+          - software-engineering
+        strength: 4
+      - id: ml_coursework_team_project
+        text: "Led a four-person coursework project that evaluated supervised learning models for tabular prediction."
+        tags:
+          - machine-learning
+          - teamwork
+        strength: 4
+
+experience:
+  - id: software_engineering_intern_examplecorp
+    company: "ExampleCorp"
+    title: "Software Engineering Intern"
+    location: "London, UK"
+    start_date: "Jun 2025"
+    end_date: "Sep 2025"
+    summary: "Built backend services and testing utilities for an internal analytics platform."
+    technologies:
+      - Python
+      - FastAPI
+      - PostgreSQL
+      - Docker
+      - GitHub Actions
+    bullets:
+      - id: api_performance_optimization
+        text: "Reduced median API response time by 38% by profiling slow database queries, adding targeted indexes, and simplifying serialization paths."
+        tags:
+          - backend
+          - performance
+          - software-engineering
+        strength: 5
+      - id: automated_testing
+        text: "Added integration tests and CI checks that caught schema regressions before deployment."
+        tags:
+          - testing
+          - ci-cd
+          - reliability
+        strength: 4
+      - id: stakeholder_demo
+        text: "Presented sprint demos to product managers and analysts, translating engineering trade-offs into clear delivery decisions."
+        tags:
+          - communication
+          - stakeholder-management
+        strength: 4
+
+  - id: ml_research_assistant_datainsight_lab
+    company: "DataInsight Lab"
+    title: "Machine Learning Research Assistant"
+    location: "Remote"
+    start_date: "Oct 2025"
+    end_date: "Mar 2026"
+    summary: "Supported applied ML experiments for noisy operational datasets."
+    technologies:
+      - Python
+      - PyTorch
+      - scikit-learn
+      - Pandas
+      - MLflow
+    bullets:
+      - id: model_evaluation_pipeline
+        text: "Built a reproducible model evaluation pipeline comparing baseline, tree-based, and neural models across precision, recall, F1, and calibration metrics."
+        tags:
+          - machine-learning
+          - evaluation
+          - reproducibility
+        strength: 5
+      - id: feature_quality_checks
+        text: "Implemented data validation checks for missingness, leakage, and distribution drift before training jobs."
+        tags:
+          - data-quality
+          - mlops
+          - pipelines
+        strength: 5
+      - id: experiment_documentation
+        text: "Documented experiment results in concise technical notes used by the research team to choose follow-up modelling work."
+        tags:
+          - writing
+          - technical-communication
+          - research
+        strength: 4
+
+  - id: startup_events_coordinator_founderhub
+    company: "FounderHub Society"
+    title: "Startup Events Coordinator"
+    location: "London, UK"
+    start_date: "Jan 2025"
+    end_date: "Present"
+    summary: "Coordinated entrepreneurship events connecting students, technical builders, founders, and mentors."
+    technologies:
+      - Notion
+      - Airtable
+      - Mailchimp
+      - Canva
+    bullets:
+      - id: founder_panel_delivery
+        text: "Organised a 180-attendee founder panel by coordinating speakers, venue operations, promotion, and volunteer staffing."
+        tags:
+          - events
+          - operations
+          - stakeholder-management
+        strength: 5
+      - id: sponsor_outreach
+        text: "Secured sponsorship support through targeted outreach emails, follow-up calls, and partner relationship management."
+        tags:
+          - outreach
+          - sponsorship
+          - communication
+        strength: 5
+      - id: community_content
+        text: "Created event recaps and founder interview posts that increased community newsletter engagement."
+        tags:
+          - content
+          - community
+          - writing
+        strength: 4
+
+projects:
+  - id: distributed_file_storage
+    name: "Distributed File Storage"
+    date: "2026"
+    category: "systems"
+    subtitle: "Fault-tolerant storage prototype"
+    description: "Designed a small distributed storage system for replication and failure recovery experiments."
+    technologies:
+      - Go
+      - gRPC
+      - Docker
+      - Linux
+    links:
+      - label: "GitHub"
+        url: "https://github.com/alex-example/distributed-file-storage"
+    bullets:
+      - id: replication_fault_tolerance
+        text: "Implemented chunk replication and node health checks to maintain file availability during simulated node failures."
+        tags:
+          - distributed-systems
+          - reliability
+        strength: 5
+      - id: grpc_communication
+        text: "Designed gRPC services for metadata coordination, file upload, and peer-to-peer chunk transfer."
+        tags:
+          - backend
+          - grpc
+        strength: 4
+
+  - id: ml_model_monitoring_dashboard
+    name: "ML Model Monitoring Dashboard"
+    date: "2026"
+    category: "machine_learning"
+    subtitle: "Model evaluation and drift monitoring"
+    description: "Built a dashboard for tracking model metrics and dataset drift over time."
+    technologies:
+      - Python
+      - Streamlit
+      - scikit-learn
+      - Pandas
+      - Plotly
+    links:
+      - label: "GitHub"
+        url: "https://github.com/alex-example/ml-monitoring-dashboard"
+      - label: "Demo"
+        url: "https://alexexample.dev/ml-monitoring"
+    bullets:
+      - id: drift_detection
+        text: "Added drift reports comparing feature distributions between training data and production-style batches."
+        tags:
+          - mlops
+          - data
+          - monitoring
+        strength: 5
+      - id: evaluation_visualization
+        text: "Visualised precision-recall curves, confusion matrices, and calibration plots for multiple model versions."
+        tags:
+          - machine-learning
+          - evaluation
+          - visualization
+        strength: 4
+
+  - id: campus_startup_weekend_platform
+    name: "Campus Startup Weekend Platform"
+    date: "2025"
+    category: "community"
+    subtitle: "Event operations and team matching tool"
+    description: "Created a lightweight tool to manage participant profiles, team formation, mentor sessions, and event communications."
+    technologies:
+      - TypeScript
+      - Next.js
+      - Airtable
+      - Vercel
+    links:
+      - label: "Devpost"
+        url: "https://devpost.com/software/campus-startup-weekend-platform"
+    bullets:
+      - id: participant_matching
+        text: "Designed participant intake and team matching workflows for designers, engineers, and business-focused attendees."
+        tags:
+          - events
+          - product
+          - community
+        strength: 5
+      - id: mentor_schedule_operations
+        text: "Coordinated mentor booking slots and automated attendee updates during a live weekend event."
+        tags:
+          - operations
+          - stakeholder-management
+          - communication
+        strength: 4
+
+skills:
+  programming_languages:
+    - Python
+    - Java
+    - C++
+    - Go
+    - TypeScript
+    - SQL
+  backend:
+    - FastAPI
+    - REST APIs
+    - gRPC
+    - PostgreSQL
+    - API design
+  frontend:
+    - React
+    - Next.js
+    - Streamlit
+  machine_learning:
+    - PyTorch
+    - scikit-learn
+    - TensorFlow
+    - XGBoost
+    - Model evaluation
+    - Feature engineering
+  data:
+    - Pandas
+    - NumPy
+    - EDA
+    - Statistical analysis
+    - Time-series analysis
+  cloud_devops:
+    - Docker
+    - GitHub Actions
+    - AWS
+    - GCP
+    - MLflow
+  tools:
+    - Git
+    - Linux CLI
+    - JIRA
+    - Confluence
+    - Notion
+    - Airtable
+  concepts:
+    - Distributed systems
+    - Testing
+    - CI/CD
+    - MLOps
+    - Data pipelines
+  communication:
+    - Technical writing
+    - Public speaking
+    - Stakeholder management
+    - Sponsorship outreach
+    - Event operations
+
+volunteering:
+  - id: code_club_mentor
+    organization: "Local Code Club"
+    role: "Volunteer Mentor"
+    location: "London, UK"
+    start_date: "2024"
+    end_date: "Present"
+    bullets:
+      - id: mentor_python_basics
+        text: "Mentored beginners through Python basics, debugging exercises, and small portfolio projects."
+        tags:
+          - mentoring
+          - python
+          - community
+        strength: 4
+
+leadership:
+  - id: computing_society_committee
+    organization: "University Computing Society"
+    role: "Committee Member"
+    location: "London, UK"
+    start_date: "2024"
+    end_date: "2026"
+    bullets:
+      - id: technical_workshop_series
+        text: "Organised a technical workshop series covering Git, APIs, cloud deployment, and practical machine learning."
+        tags:
+          - leadership
+          - teaching
+          - software-engineering
+        strength: 5
+
+achievements:
+  - id: dean_list_2025
+    title: "Dean's List"
+    issuer: "Northbridge University"
+    date: "2025"
+    description: "Recognised for academic performance in the 2024/25 academic year."
+    tags:
+      - academic
+    strength: 4
+
+  - id: hackathon_best_ml_project
+    title: "Best ML Project"
+    issuer: "City Hack 2025"
+    date: "2025"
+    description: "Awarded for a prototype that used computer vision to prioritise support requests during campus events."
+    tags:
+      - machine-learning
+      - hackathon
+      - events
+    strength: 5
+
+certifications:
+  - id: aws_cloud_practitioner
+    name: "AWS Certified Cloud Practitioner"
+    issuer: "Amazon Web Services"
+    date: "2025"
+    credential_url: "https://aws.amazon.com/certification/"
+    tags:
+      - cloud
+      - aws
+    strength: 4
+
+  - id: datacamp_ml_scientist
+    name: "Machine Learning Scientist with Python"
+    issuer: "DataCamp"
+    date: "2025"
+    credential_url: "https://www.datacamp.com/"
+    tags:
+      - machine-learning
+      - python
+    strength: 3
+
+custom_sections:
+  leadership_volunteering_outreach:
+    title: "Leadership, Volunteering & Outreach"
+    items:
+      - id: badminton_team_captain
+        text: "Division 5 Team Captain, University Badminton Club: coordinated training, scheduled fixtures with opposition captains, mentored junior teammates, and led match strategy."
+        tags:
+          - leadership
+          - teamwork
+          - sports
+          - communication
+        strength: 4
+
+      - id: entrepreneurship_cell_core_member
+        text: "Core Member, Entrepreneurship Development Cell: secured monetary and non-monetary sponsors through outreach calls for a large student entrepreneurship event."
+        tags:
+          - entrepreneurship
+          - outreach
+          - sponsorship
+          - events
+        strength: 5
+
+      - id: technical_blog_writer
+        text: "Technical Blog Writer: published technical blogs on machine learning and project work."
+        tags:
+          - writing
+          - technical-communication
+          - machine-learning
+        strength: 4
