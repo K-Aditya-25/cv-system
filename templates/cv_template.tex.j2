@@ -26,10 +26,10 @@
 \renewcommand{\labelitemi}{\textbullet}
 
 \newcommand{\cvsection}[1]{%
-  \vspace{6pt}%
-  {\large\bfseries\color{AccentBlue} #1}\\[-2pt]%
-  {\color{AccentBlue}\hrule height 0.45pt}%
-  \vspace{3pt}%
+  \par\addvspace{6pt}%
+  \noindent{\large\bfseries\color{AccentBlue} #1}\par\vspace{-2pt}%
+  \noindent{\color{AccentBlue}\hrule height 0.45pt}%
+  \par\addvspace{3pt}%
 }
 \newcommand{\cvrow}[2]{%
   \begin{tabularx}{\linewidth}{@{}X>{\raggedleft\arraybackslash}p{0.30\linewidth}@{}}
@@ -72,10 +72,10 @@
 {% if item.degree or item.grade or item.location %}
 \cvrow{ {{ item.degree | tex }}{% if item.grade %}, {{ item.grade | tex }}{% endif %}}{ {{ item.location | tex }} }
 {% endif %}
-{% if item.coursework %}
+{% if job.include_coursework and item.coursework %}
 \textit{Relevant Coursework:} {{ item.coursework | map('tex') | join(', ') }}
 {% endif %}
-{% if item.bullets %}
+{% if job.include_education_bullets and item.bullets %}
 \begin{itemize}
 {% for bullet in item.bullets %}
   \item {{ bullet.text | tex }}
@@ -90,12 +90,13 @@
 {% for category, values in skills.items() %}
 \textbf{ {{ category | category_label | tex }}:} {{ values | map('tex') | join(', ') }}{% if not loop.last %}\\[1pt]{% endif %}
 {% endfor %}
+\par
 
 {% elif section_key == "experience" %}
 \cvsection{ {{ section_titles[section_key] | tex }} }
 {% for item in experience %}
 \cvrow{\textbf{ {{ item.title | tex }} }}{ {{ [item.start_date, item.end_date] | select | join(' -- ') | tex }} }
-\cvrow{ {{ item.company | tex }}{% if item.technologies %} \textbar{} \textit{ {{ item.technologies | map('tex') | join(', ') }} }{% endif %}}{ {{ item.location | tex }} }
+\cvrow{ {{ item.company | tex }}{% if job.show_experience_technologies and item.technologies %} \textbar{} \textit{ {{ item.technologies | map('tex') | join(', ') }} }{% endif %}}{ {{ item.location | tex }} }
 {% if item.bullets %}
 \begin{itemize}
 {% for bullet in item.bullets %}
@@ -109,13 +110,14 @@
 {% elif section_key == "projects" %}
 \cvsection{ {{ section_titles[section_key] | tex }} }
 {% for item in projects %}
+{% set project_technologies = item.technologies[:3] %}
 {% set project_links = [] %}
 {% for link in item.links %}
   {% set _ = project_links.append('\\href{\\detokenize{' ~ (link.url | tex_url) ~ '}}{' ~ (link.label | tex) ~ '}') %}
 {% endfor %}
 \cvrow{\textbf{ {{ item.name | tex }} }{% if project_links %} -- {{ project_links | join(' $\\vert$ ') }}{% endif %}}{ {{ item.date | tex }} }
-{% if item.subtitle or item.description or item.technologies %}
-\cvrow{ {% if item.subtitle %}{{ item.subtitle | tex }}{% elif item.description %}{{ item.description | tex }}{% endif %} }{ {% if item.technologies %}\textit{ {{ item.technologies | map('tex') | join(', ') }} }{% endif %} }
+{% if item.subtitle or item.description or (job.show_project_technologies and project_technologies) %}
+\cvrow{ {% if item.subtitle %}{{ item.subtitle | tex }}{% elif item.description %}{{ item.description | tex }}{% endif %} }{ {% if job.show_project_technologies and project_technologies %}\textit{ {{ project_technologies | map('tex') | join(', ') }} }{% endif %} }
 {% endif %}
 {% if item.bullets %}
 \begin{itemize}

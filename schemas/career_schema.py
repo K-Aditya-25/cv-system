@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictBaseModel(BaseModel):
@@ -244,6 +244,10 @@ class JobConfig(StrictBaseModel):
     output_name: str = Field(min_length=1)
     template: str = Field(default="cv_template.tex.j2")
     sections_order: list[str] | None = None
+    include_coursework: bool = False
+    include_education_bullets: bool = False
+    show_experience_technologies: bool = False
+    show_project_technologies: bool = False
 
 
 def ensure_unique_ids(items: list[object], section_name: str) -> None:

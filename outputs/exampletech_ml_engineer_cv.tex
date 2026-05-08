@@ -26,10 +26,10 @@
 \renewcommand{\labelitemi}{\textbullet}
 
 \newcommand{\cvsection}[1]{%
-  \vspace{6pt}%
-  {\large\bfseries\color{AccentBlue} #1}\\[-2pt]%
-  {\color{AccentBlue}\hrule height 0.45pt}%
-  \vspace{3pt}%
+  \par\addvspace{6pt}%
+  \noindent{\large\bfseries\color{AccentBlue} #1}\par\vspace{-2pt}%
+  \noindent{\color{AccentBlue}\hrule height 0.45pt}%
+  \par\addvspace{3pt}%
 }
 \newcommand{\cvrow}[2]{%
   \begin{tabularx}{\linewidth}{@{}X>{\raggedleft\arraybackslash}p{0.30\linewidth}@{}}
@@ -48,24 +48,21 @@
 \cvsection{ Education }
 \cvrow{\textbf{ Example University }}{ 2023 -- 2027 }
 \cvrow{ BSc Computer Engineering, First Class Honours expected}{ London, UK }
-\textit{Relevant Coursework:} Data Structures \& Algorithms, Machine Learning, Distributed Systems, Database Systems, Probability \& Statistics
-\begin{itemize}
-  \item Recognised for strong academic performance across software engineering and mathematics modules.
-\end{itemize}
 \cventryspace
 
 \cvsection{ Technical Skills }
-\textbf{ Programming:} Python, Java, C++, SQL\\[1pt]\textbf{ ML:} PyTorch, scikit-learn, Model evaluation, Feature engineering\\[1pt]\textbf{ Data:} Pandas, NumPy, Statistical analysis\\[1pt]\textbf{ Cloud \& DevOps:} Docker, GitHub Actions, AWS, MLflow
+\textbf{ Programming:} Python, Java, C++, SQL\\[1pt]\textbf{ ML:} PyTorch, scikit-learn, Model evaluation, Feature engineering\\[1pt]\textbf{ Data:} Pandas, NumPy, Statistical analysis\\[1pt]\textbf{ Cloud \& DevOps:} Docker, GitHub Actions, AWS, MLflow\par
+
 \cvsection{ Experience }
 \cvrow{\textbf{ Machine Learning Research Assistant }}{ Oct 2025 -- Mar 2026 }
-\cvrow{ Example AI Lab \textbar{} \textit{ Python, PyTorch, scikit-learn, Pandas, MLflow }}{ Remote }
+\cvrow{ Example AI Lab}{ Remote }
 \begin{itemize}
   \item Built a reproducible model evaluation pipeline comparing baseline, tree-based, and neural models across precision, recall, F1, and calibration metrics.
   \item Implemented data validation checks for missingness, leakage, and distribution drift before training jobs.
 \end{itemize}
 \cventryspace
 \cvrow{\textbf{ Software Engineering Intern }}{ Jun 2025 -- Sep 2025 }
-\cvrow{ ExampleCorp \textbar{} \textit{ Python, FastAPI, PostgreSQL, Docker, GitHub Actions }}{ London, UK }
+\cvrow{ ExampleCorp}{ London, UK }
 \begin{itemize}
   \item Reduced median API response time by profiling slow database queries, adding targeted indexes, and simplifying serialization paths.
   \item Added integration tests and CI checks that caught schema regressions before deployment.
@@ -74,14 +71,14 @@
 
 \cvsection{ Projects }
 \cvrow{\textbf{ ML Model Monitoring Dashboard } -- \href{\detokenize{https://github.com/example/ml-monitoring-dashboard}}{GitHub}}{ 2026 }
-\cvrow{ Model evaluation and drift monitoring }{ \textit{ Python, Streamlit, scikit-learn, Pandas, Plotly } }
+\cvrow{ Model evaluation and drift monitoring }{  }
 \begin{itemize}
   \item Added drift reports comparing feature distributions between training data and production-style batches.
   \item Visualised precision-recall curves, confusion matrices, and calibration plots for multiple model versions.
 \end{itemize}
 \cventryspace
 \cvrow{\textbf{ Distributed File Storage } -- \href{\detokenize{https://github.com/example/distributed-file-storage}}{GitHub}}{ 2026 }
-\cvrow{ Fault-tolerant storage prototype }{ \textit{ Go, gRPC, Docker, Linux } }
+\cvrow{ Fault-tolerant storage prototype }{  }
 \begin{itemize}
   \item Implemented chunk replication and node health checks to maintain file availability during simulated node failures.
   \item Designed gRPC services for metadata coordination, file upload, and peer-to-peer chunk transfer.

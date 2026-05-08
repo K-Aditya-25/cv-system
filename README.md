@@ -8,6 +8,12 @@ The core workflow is:
 career database + job description + job config + selection file -> tailored LaTeX CV -> PDF
 ```
 
+The v1 workflow adds an optional intake layer:
+
+```text
+job description + career database -> LLM-selected job files -> tailored LaTeX CV -> PDF
+```
+
 The master career database is the source of truth. CVs are generated artifacts. A generated CV should never invent information: it should only use selected IDs and bullet IDs that already exist in the configured master data file.
 
 ## What This Is
@@ -20,6 +26,7 @@ This is a simple, practical CV generation system built with:
 - Pydantic v2 for validation
 - Jinja2 for rendering LaTeX
 - LaTeX for PDF output
+- optional LLM API calls for job intake and selection automation
 
 This is not a web app. It does not use PostgreSQL or a complex database. YAML is intentionally used first because it is readable, Git-friendly, and easy to edit.
 
@@ -31,6 +38,11 @@ Your real career database should stay private. This repo is designed so the code
 - `data/master.private.yaml` is your real local career database and is ignored by Git.
 - `data/master.yaml` is also ignored for compatibility if you prefer that local filename.
 - `data/raw_inputs/*` is ignored so old CVs, LinkedIn exports, and notes are not uploaded.
+- `.env` and `.env.*` are ignored so local API keys are not uploaded.
+
+When using the LLM intake workflow, the configured provider receives the job description and a compact candidate inventory containing career IDs, skills, bullet text, tags, and strengths. Use the manual workflow for roles or data you do not want to send to an external API.
+
+The API key is not included in prompts, job files, or generated CVs. The intake script reads `ANTHROPIC_API_KEY` from the process environment, `.env.local`, or `.env`, and those env files are ignored by Git. Do not paste API keys into job descriptions, prompt files, YAML files, or chat messages.
 
 By default, scripts use `data/master.example.yaml`. To use your private file locally, set:
 
@@ -58,6 +70,9 @@ cv-system/
     career_schema.py
   templates/
     cv_template.tex.j2
+  prompts/
+    job_intake_system.md
+    job_intake_user.md.j2
   jobs/
     example_technical_ml_role/
       job_config.yaml
@@ -69,6 +84,7 @@ cv-system/
       selection.yaml
   scripts/
     validate_data.py
+    create_job_from_description.py
     generate_cv.py
     compile_pdf.sh
   outputs/
@@ -133,6 +149,140 @@ Expected files:
 jobs/example_startup_events_role/communityforge_startup_events_cv.tex
 outputs/communityforge_startup_events_cv.tex
 ```
+
+## V1: One-Shot Job Intake With Claude
+
+The v1 intake command creates a new job folder from pasted job description text and can call Claude through the Anthropic API to generate:
+
+- `job_description.md`
+- `llm_prompt.md`
+- `job_config.yaml`
+- `selection.yaml`
+- `job_summary.txt`
+- `selection_rationale.md`
+- generated `.tex` CV
+- optional compiled `.pdf`
+
+Claude credits work for this workflow if they are Anthropic API credits and you have an `ANTHROPIC_API_KEY`. A Claude app subscription by itself is not usually an API key.
+
+Store the key in an ignored local env file:
+
+```bash
+read -s ANTHROPIC_API_KEY
+printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY" > .env.local
+unset ANTHROPIC_API_KEY
+```
+
+Or load it for one terminal session without putting it directly in the command you run:
+
+```bash
+read -s ANTHROPIC_API_KEY
+export ANTHROPIC_API_KEY
+```
+
+Interactive mode is the intended no-file workflow. You run one command, paste the LinkedIn job description, type `END`, paste any CV preferences, then type `END` again:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  --interactive \
+  --provider anthropic \
+  --compile-pdf
+```
+
+You can also paste a job description directly into a single command and provide preferences inline:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  --job-description-text "Paste the LinkedIn job description here" \
+  --job-id acme_software_engineer \
+  --provider anthropic \
+  --cv-requirements "Keep it to one page. Prioritize backend ML systems. Omit weakly relevant sections." \
+  --compile-pdf
+```
+
+For long job descriptions, stdin avoids shell quoting:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+pbpaste | uv run python scripts/create_job_from_description.py \
+  --job-description-stdin \
+  --job-id acme_software_engineer \
+  --provider anthropic \
+  --cv-requirements "Keep it to one page and emphasize production engineering." \
+  --compile-pdf
+```
+
+Prompt-only mode writes the exact prompt package without calling an LLM. This is useful when you want to inspect what would be sent to Claude:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  --interactive \
+  --provider prompt-only
+```
+
+The file-based workflow still works if you want repeatable source files:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py data/raw_inputs/acme_job.md \
+  --job-id acme_software_engineer \
+  --provider anthropic \
+  --cv-requirements-file data/raw_inputs/acme_cv_requirements.md \
+  --compile-pdf
+```
+
+The default Claude model is set in `scripts/create_job_from_description.py`. Override it without editing code by setting `CV_LLM_MODEL`.
+
+If the LLM returns invalid IDs or malformed JSON, the script fails before writing the generated YAML/CV. Re-run in prompt-only mode to inspect the generated prompt, or adjust the prompt templates under `prompts/`.
+
+Per-job CV requirements can be supplied interactively, inline with `--cv-requirements`, or from a file with `--cv-requirements-file`. Use these for any job-specific preference that should influence the generated CV, including section inclusion or exclusion, content emphasis, section ordering, tone, length, or constraints on what not to mention. The script saves the resolved requirements to `cv_requirements.md` inside the generated job folder.
+
+Default v1 styling/content behavior:
+
+- CV length is forced to `one_page` unless your requirements or refinement feedback explicitly ask for a longer CV
+- education stays compact
+- coursework is hidden unless explicitly requested or unusually relevant
+- education bullets are hidden unless explicitly requested or unusually relevant
+- internship/job technology lists are hidden by default
+- project technology lists are hidden by default and capped at three items when shown
+- section headings are forced onto separate lines by the LaTeX template
+
+To iterate on a generated CV, refine the existing job folder with feedback instead of starting over:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  --refine-job jobs/acme_software_engineer \
+  --interactive \
+  --provider anthropic \
+  --compile-pdf
+```
+
+The script will ask for revision feedback. Example feedback:
+
+```text
+Make education shorter.
+Remove certifications.
+Use stronger backend evidence.
+Do not mention tools beside internships.
+END
+```
+
+For a one-command refinement:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  --refine-job jobs/acme_software_engineer \
+  --feedback "Remove certifications, shorten education, and use stronger backend bullets." \
+  --provider anthropic \
+  --compile-pdf
+```
+
+Refinement updates `job_config.yaml`, `selection.yaml`, `job_summary.txt`, `selection_rationale.md`, and the generated CV. It also appends your feedback to `revision_feedback.md` and writes the latest refinement prompt to `llm_refine_prompt.md`.
 
 ## Compile PDF
 

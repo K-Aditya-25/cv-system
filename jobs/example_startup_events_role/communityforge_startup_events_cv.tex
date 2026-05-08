@@ -26,10 +26,10 @@
 \renewcommand{\labelitemi}{\textbullet}
 
 \newcommand{\cvsection}[1]{%
-  \vspace{6pt}%
-  {\large\bfseries\color{AccentBlue} #1}\\[-2pt]%
-  {\color{AccentBlue}\hrule height 0.45pt}%
-  \vspace{3pt}%
+  \par\addvspace{6pt}%
+  \noindent{\large\bfseries\color{AccentBlue} #1}\par\vspace{-2pt}%
+  \noindent{\color{AccentBlue}\hrule height 0.45pt}%
+  \par\addvspace{3pt}%
 }
 \newcommand{\cvrow}[2]{%
   \begin{tabularx}{\linewidth}{@{}X>{\raggedleft\arraybackslash}p{0.30\linewidth}@{}}
@@ -51,22 +51,18 @@ Computer engineering student focused on machine learning systems, backend softwa
 \cvsection{ Education }
 \cvrow{\textbf{ Example University }}{ 2023 -- 2027 }
 \cvrow{ BSc Computer Engineering, First Class Honours expected}{ London, UK }
-\textit{Relevant Coursework:} Data Structures \& Algorithms, Machine Learning, Distributed Systems, Database Systems, Probability \& Statistics
-\begin{itemize}
-  \item Recognised for strong academic performance across software engineering and mathematics modules.
-\end{itemize}
 \cventryspace
 
 \cvsection{ Experience }
 \cvrow{\textbf{ Startup Events Coordinator }}{ Jan 2025 -- Present }
-\cvrow{ FounderHub Society \textbar{} \textit{ Notion, Airtable, Mailchimp, Canva }}{ London, UK }
+\cvrow{ FounderHub Society}{ London, UK }
 \begin{itemize}
   \item Organised a founder panel by coordinating speakers, venue operations, promotion, and volunteer staffing.
   \item Secured sponsorship support through targeted outreach emails, follow-up calls, and partner relationship management.
 \end{itemize}
 \cventryspace
 \cvrow{\textbf{ Software Engineering Intern }}{ Jun 2025 -- Sep 2025 }
-\cvrow{ ExampleCorp \textbar{} \textit{ Python, FastAPI, PostgreSQL, Docker, GitHub Actions }}{ London, UK }
+\cvrow{ ExampleCorp}{ London, UK }
 \begin{itemize}
   \item Presented sprint demos to product managers and analysts, translating engineering trade-offs into clear delivery decisions.
   \item Added integration tests and CI checks that caught schema regressions before deployment.
@@ -75,14 +71,14 @@ Computer engineering student focused on machine learning systems, backend softwa
 
 \cvsection{ Projects }
 \cvrow{\textbf{ Campus Startup Weekend Platform } -- \href{\detokenize{https://devpost.com/software/example-campus-startup-weekend}}{Devpost}}{ 2025 }
-\cvrow{ Event operations and team matching tool }{ \textit{ TypeScript, Next.js, Airtable, Vercel } }
+\cvrow{ Event operations and team matching tool }{  }
 \begin{itemize}
   \item Designed participant intake and team matching workflows for designers, engineers, and business-focused attendees.
   \item Coordinated mentor booking slots and automated attendee updates during a live weekend event.
 \end{itemize}
 \cventryspace
 \cvrow{\textbf{ ML Model Monitoring Dashboard } -- \href{\detokenize{https://github.com/example/ml-monitoring-dashboard}}{GitHub}}{ 2026 }
-\cvrow{ Model evaluation and drift monitoring }{ \textit{ Python, Streamlit, scikit-learn, Pandas, Plotly } }
+\cvrow{ Model evaluation and drift monitoring }{  }
 \begin{itemize}
   \item Visualised precision-recall curves, confusion matrices, and calibration plots for multiple model versions.
 \end{itemize}
@@ -96,6 +92,7 @@ Computer engineering student focused on machine learning systems, backend softwa
 \end{itemize}
 
 \cvsection{ Skills }
-\textbf{ Programming:} Python, TypeScript\\[1pt]\textbf{ Frontend:} React, Next.js, Streamlit\\[1pt]\textbf{ Tools:} Git, Notion, Airtable\\[1pt]\textbf{ Communication:} Technical writing, Public speaking, Stakeholder management, Sponsorship outreach, Event operations
+\textbf{ Programming:} Python, TypeScript\\[1pt]\textbf{ Frontend:} React, Next.js, Streamlit\\[1pt]\textbf{ Tools:} Git, Notion, Airtable\\[1pt]\textbf{ Communication:} Technical writing, Public speaking, Stakeholder management, Sponsorship outreach, Event operations\par
+
 
 \end{document}
