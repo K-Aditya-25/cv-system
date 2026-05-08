@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import os
 import re
 import sys
 from pathlib import Path
@@ -15,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from schemas.career_schema import CareerDatabase, JobConfig, Selection  # noqa: E402
+
+
+DEFAULT_MASTER_DATA_PATH = ROOT / "data" / "master.example.yaml"
 
 
 DEFAULT_SECTION_ORDERS: dict[str, list[str]] = {
@@ -98,11 +102,20 @@ LATEX_REPLACEMENTS = {
     "}": r"\}",
     "~": r"\textasciitilde{}",
     "^": r"\textasciicircum{}",
+    "€": r"\texteuro{}",
 }
 
 
 class CvGenerationError(Exception):
     pass
+
+
+def resolve_master_data_path() -> Path:
+    configured_path = os.environ.get("CV_MASTER_DATA") or os.environ.get("CVMasterData")
+    if configured_path:
+        path = Path(configured_path)
+        return path if path.is_absolute() else ROOT / path
+    return DEFAULT_MASTER_DATA_PATH
 
 
 def load_yaml(path: Path) -> Any:
@@ -332,7 +345,8 @@ def main() -> int:
         job_folder = ROOT / job_folder
 
     try:
-        database = CareerDatabase.model_validate(load_yaml(ROOT / "data" / "master.yaml"))
+        master_data_path = resolve_master_data_path()
+        database = CareerDatabase.model_validate(load_yaml(master_data_path))
         job_config = JobConfig.model_validate(load_yaml(job_folder / "job_config.yaml"))
         selection = Selection.model_validate(load_yaml(job_folder / "selection.yaml"))
 

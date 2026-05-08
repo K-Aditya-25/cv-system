@@ -1,26 +1,25 @@
 education:
-  - university_bsc_computer_engineering
+  - example_university_bsc_computer_engineering
 
 experience:
-  - id: ml_research_assistant_datainsight_lab
+  - id: example_ml_research_assistant
     bullets:
-      - model_evaluation_pipeline
-      - feature_quality_checks
-      - experiment_documentation
-  - id: software_engineering_intern_examplecorp
+      - example_model_evaluation_pipeline
+      - example_feature_quality_checks
+  - id: example_software_engineering_intern
     bullets:
-      - api_performance_optimization
-      - automated_testing
+      - example_api_performance_optimization
+      - example_automated_testing
 
 projects:
-  - id: ml_model_monitoring_dashboard
+  - id: example_ml_monitoring_dashboard
     bullets:
-      - drift_detection
-      - evaluation_visualization
-  - id: distributed_file_storage
+      - example_drift_detection
+      - example_evaluation_visualization
+  - id: example_distributed_file_storage
     bullets:
-      - replication_fault_tolerance
-      - grpc_communication
+      - example_replication_fault_tolerance
+      - example_grpc_communication
 
 skills:
   programming_languages:
@@ -42,21 +41,15 @@ skills:
     - GitHub Actions
     - AWS
     - MLflow
-  concepts:
-    - Testing
-    - CI/CD
-    - MLOps
-    - Data pipelines
 
 volunteering: []
 leadership: []
 
 achievements:
-  - dean_list_2025
-  - hackathon_best_ml_project
+  - example_dean_list_2025
+  - example_hackathon_best_ml_project
 
 certifications:
-  - aws_cloud_practitioner
-  - datacamp_ml_scientist
+  - example_aws_cloud_practitioner
 
 custom_sections: {}

@@ -1,25 +1,24 @@
 education:
-  - university_bsc_computer_engineering
+  - example_university_bsc_computer_engineering
 
 experience:
-  - id: startup_events_coordinator_founderhub
+  - id: example_startup_events_coordinator
     bullets:
-      - founder_panel_delivery
-      - sponsor_outreach
-      - community_content
-  - id: software_engineering_intern_examplecorp
+      - example_founder_panel_delivery
+      - example_sponsor_outreach
+  - id: example_software_engineering_intern
     bullets:
-      - stakeholder_demo
-      - automated_testing
+      - example_stakeholder_demo
+      - example_automated_testing
 
 projects:
-  - id: campus_startup_weekend_platform
+  - id: example_campus_startup_weekend_platform
     bullets:
-      - participant_matching
-      - mentor_schedule_operations
-  - id: ml_model_monitoring_dashboard
+      - example_participant_matching
+      - example_mentor_schedule_operations
+  - id: example_ml_monitoring_dashboard
     bullets:
-      - evaluation_visualization
+      - example_evaluation_visualization
 
 skills:
   programming_languages:
@@ -41,18 +40,18 @@ skills:
     - Event operations
 
 volunteering:
-  - code_club_mentor
+  - example_code_club_mentor
 
 leadership:
-  - computing_society_committee
+  - example_computing_society_committee
 
 achievements:
-  - hackathon_best_ml_project
+  - example_hackathon_best_ml_project
 
 certifications: []
 
 custom_sections:
   leadership_volunteering_outreach:
-    - badminton_team_captain
-    - entrepreneurship_cell_core_member
-    - technical_blog_writer
+    - example_badminton_team_captain
+    - example_entrepreneurship_cell_core_member
+    - example_technical_blog_writer

@@ -8,7 +8,7 @@ The core workflow is:
 career database + job description + job config + selection file -> tailored LaTeX CV -> PDF
 ```
 
-The master career database is the source of truth. CVs are generated artifacts. A generated CV should never invent information: it should only use selected IDs and bullet IDs that already exist in `data/master.yaml`.
+The master career database is the source of truth. CVs are generated artifacts. A generated CV should never invent information: it should only use selected IDs and bullet IDs that already exist in the configured master data file.
 
 ## What This Is
 
@@ -23,11 +23,23 @@ This is a simple, practical CV generation system built with:
 
 This is not a web app. It does not use PostgreSQL or a complex database. YAML is intentionally used first because it is readable, Git-friendly, and easy to edit.
 
-## Placeholder Data
+## Data Privacy
 
-The included `data/master.yaml` contains realistic dummy content only. It demonstrates the schema and generation pipeline, but it is not your real career database.
+Your real career database should stay private. This repo is designed so the code, schema, templates, and fake example data can be public, while your real career data remains local.
 
-Later, your existing CVs, LinkedIn text, project notes, GitHub README files, certifications, and rough notes can be used to populate the real `data/master.yaml`. Once extracted and reviewed, `data/master.yaml` becomes the source of truth.
+- `data/master.example.yaml` is safe dummy data committed to the repo.
+- `data/master.private.yaml` is your real local career database and is ignored by Git.
+- `data/master.yaml` is also ignored for compatibility if you prefer that local filename.
+- `data/raw_inputs/*` is ignored so old CVs, LinkedIn exports, and notes are not uploaded.
+
+By default, scripts use `data/master.example.yaml`. To use your private file locally, set:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml uv run python scripts/validate_data.py
+CV_MASTER_DATA=data/master.private.yaml uv run python scripts/generate_cv.py jobs/my_real_job_folder
+```
+
+The scripts also accept `CVMasterData` as a compatibility alias, but `CV_MASTER_DATA` is recommended for shell use.
 
 ## Folder Structure
 
@@ -38,7 +50,8 @@ cv-system/
   uv.lock
   .python-version
   data/
-    master.yaml
+    master.example.yaml
+    master.private.yaml   # local only, ignored by Git
     raw_inputs/
       README.md
   schemas/
@@ -85,7 +98,11 @@ The scripts do not require manual virtual environment activation. Run them throu
 uv run python scripts/validate_data.py
 ```
 
-This validates `data/master.yaml` using the Pydantic models in `schemas/career_schema.py`.
+This validates the configured master data file using the Pydantic models in `schemas/career_schema.py`. By default, it validates `data/master.example.yaml`. To validate your private database:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml uv run python scripts/validate_data.py
+```
 
 ## Generate CVs
 
@@ -94,6 +111,8 @@ Generate the technical ML/software example:
 ```bash
 uv run python scripts/generate_cv.py jobs/example_technical_ml_role
 ```
+
+This uses `data/master.example.yaml` unless `CV_MASTER_DATA` is set.
 
 Expected files:
 
@@ -123,13 +142,19 @@ Compile a generated `.tex` file:
 bash scripts/compile_pdf.sh jobs/example_technical_ml_role/exampletech_ml_engineer_cv.tex
 ```
 
-The script uses `latexmk -pdf` if available. If `latexmk` is missing, it falls back to `pdflatex`. If neither is installed, it prints a helpful error.
+The script uses `latexmk -pdf` if available, then `tectonic`, then `pdflatex`. If none are installed, it prints a helpful error.
 
 ## How the Files Work
 
-### `data/master.yaml`
+### Master Data Files
 
-This is the structured career database. It includes:
+The structured career database can live in either:
+
+- `data/master.example.yaml`: safe public sample data
+- `data/master.private.yaml`: real private data, ignored by Git
+- any other path passed through `CV_MASTER_DATA`
+
+The master data includes:
 
 - `profile`
 - `education`
@@ -143,6 +168,8 @@ This is the structured career database. It includes:
 - `custom_sections`
 
 Every reusable item has an `id`. Bullets also have IDs. Job-specific CVs refer to these IDs from `selection.yaml`.
+
+The example job folders use IDs from `data/master.example.yaml`. Your real job folders should use IDs from your private data file.
 
 ### Job Folders
 
@@ -158,7 +185,7 @@ Create a new job by copying one of the example folders and editing the files.
 
 ### Add Education
 
-Add a new item under `education` with an ID:
+Add a new item under `education` in your private master data file with an ID:
 
 ```yaml
 education:
@@ -335,33 +362,41 @@ Special LaTeX characters in plain text are escaped by the generator. URLs are ha
 
 `Selected ID does not exist`
 
-Check that the ID in `selection.yaml` exactly matches an ID in `data/master.yaml`.
+Check that the ID in `selection.yaml` exactly matches an ID in the master data file currently being used. If you are using private data, confirm `CV_MASTER_DATA=data/master.private.yaml` is set.
 
 `Selected bullet does not belong to selected item`
 
-Bullet IDs are scoped to their parent experience or project. Confirm the bullet is listed under the selected item in `data/master.yaml`.
+Bullet IDs are scoped to their parent experience or project. Confirm the bullet is listed under the selected item in the configured master data file.
 
 `Selected skill does not exist`
 
-Skills must first be listed in `data/master.yaml`, then selected by category in `selection.yaml`.
+Skills must first be listed in the configured master data file, then selected by category in `selection.yaml`.
 
 `Template not found`
 
 Confirm `template` in `job_config.yaml` matches a file in `templates/`.
 
-`latexmk: command not found`
+`No LaTeX compiler found`
 
-Install a LaTeX distribution that includes `latexmk`, or install `pdflatex`. On macOS, MacTeX is the common full distribution.
+Install `latexmk`, `tectonic`, or `pdflatex`. On macOS, MacTeX is the common full LaTeX distribution; Tectonic is a lighter alternative.
+
+`The example jobs work, but my private jobs fail`
+
+The example jobs are wired to `data/master.example.yaml`. Real job folders need selections that reference IDs in your private data. Run private jobs like this:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml uv run python scripts/generate_cv.py jobs/my_real_job_folder
+```
 
 ## Recommended Future Data Ingestion Workflow
 
 1. Collect old CVs, LinkedIn text, project notes, GitHub README text, and certificates.
 2. Convert PDFs to text manually or with a tool.
 3. Place raw text in `data/raw_inputs/`.
-4. Ask GPT/Codex to extract unique reusable career information into `data/master.yaml`.
-5. Validate with `uv run python scripts/validate_data.py`.
+4. Ask GPT/Codex to extract unique reusable career information into `data/master.private.yaml`.
+5. Validate with `CV_MASTER_DATA=data/master.private.yaml uv run python scripts/validate_data.py`.
 6. Review manually.
-7. Commit the updated database to Git.
+7. Keep `data/master.private.yaml` local; commit only code, templates, schemas, and sanitized examples.
 
 ## Future Extensions
 

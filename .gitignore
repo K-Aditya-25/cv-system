@@ -11,6 +11,12 @@ __pycache__/
 *.synctex.gz
 *.pdf
 
+# Private source material used to build data/master.yaml
+data/master.yaml
+data/master.private.yaml
+data/raw_inputs/*
+!data/raw_inputs/README.md
+
 # OS/editor noise
 .DS_Store
 .idea/
