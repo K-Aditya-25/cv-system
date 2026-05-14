@@ -73,6 +73,7 @@ cv-system/
   prompts/
     job_intake_system.md
     job_intake_user.md.j2
+    job_refine_user.md.j2
   jobs/
     example_technical_ml_role/
       job_config.yaml
@@ -152,7 +153,7 @@ outputs/communityforge_startup_events_cv.tex
 
 ## V1: One-Shot Job Intake With Claude
 
-The v1 intake command creates a new job folder from pasted job description text and can call Claude through the Anthropic API to generate:
+The v1 intake command creates a new job folder from pasted job description text. It can either call Claude through the Anthropic API for job parsing and selection, or run in prompt-only mode so you can inspect the exact prompt package before making an LLM call.
 
 - `job_description.md`
 - `llm_prompt.md`
@@ -162,6 +163,8 @@ The v1 intake command creates a new job folder from pasted job description text 
 - `selection_rationale.md`
 - generated `.tex` CV
 - optional compiled `.pdf`
+
+In automatic Claude mode, job folders are named from the generated company and role, for example `acme_software_engineer`. If a folder already exists, the script appends a numeric suffix. Use `--job-id` only when you want to override that default.
 
 Claude credits work for this workflow if they are Anthropic API credits and you have an `ANTHROPIC_API_KEY`. A Claude app subscription by itself is not usually an API key.
 
@@ -214,7 +217,7 @@ pbpaste | uv run python scripts/create_job_from_description.py \
   --compile-pdf
 ```
 
-Prompt-only mode writes the exact prompt package without calling an LLM. This is useful when you want to inspect what would be sent to Claude:
+Prompt-only mode writes the exact prompt package without calling an LLM. This is useful when you want to inspect what would be sent to Claude, keep the workflow manual, or run the prompt elsewhere:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml \
@@ -242,12 +245,16 @@ Per-job CV requirements can be supplied interactively, inline with `--cv-require
 
 Default v1 styling/content behavior:
 
-- CV length is forced to `one_page` unless your requirements or refinement feedback explicitly ask for a longer CV
+- CV length is set to `one_page` unless your requirements or refinement feedback explicitly ask for a longer CV
+- when `--compile-pdf` is used, the script verifies the compiled PDF is one page and can ask Claude for a shorter revised selection if it is too long
 - education stays compact
 - coursework is hidden unless explicitly requested or unusually relevant
 - education bullets are hidden unless explicitly requested or unusually relevant
 - internship/job technology lists are hidden by default
 - project technology lists are hidden by default and capped at three items when shown
+- every selected project must have at least one GitHub, Devpost, or Kaggle link in master data
+- all available GitHub, Devpost, and Kaggle project links are rendered when present
+- experience and project bullets should be selected with one-line rendered length as a priority
 - section headings are forced onto separate lines by the LaTeX template
 
 To iterate on a generated CV, refine the existing job folder with feedback instead of starting over:
@@ -282,7 +289,7 @@ uv run python scripts/create_job_from_description.py \
   --compile-pdf
 ```
 
-Refinement updates `job_config.yaml`, `selection.yaml`, `job_summary.txt`, `selection_rationale.md`, and the generated CV. It also appends your feedback to `revision_feedback.md` and writes the latest refinement prompt to `llm_refine_prompt.md`.
+Refinement updates `job_config.yaml`, `selection.yaml`, `job_summary.txt`, `selection_rationale.md`, and the generated CV. It also appends your feedback to `revision_feedback.md` and writes the latest refinement prompt to `llm_refine_prompt.md`. Use `--provider prompt-only` with `--refine-job` to write only the refinement prompt without calling Claude.
 
 ## Compile PDF
 
@@ -550,15 +557,15 @@ CV_MASTER_DATA=data/master.private.yaml uv run python scripts/generate_cv.py job
 
 ## Future Extensions
 
-This MVP is designed so it can later grow into:
+This MVP already has Anthropic-backed v1 job intake, basic job parsing and selection, prompt-only prompt export, refinement, and one-page PDF enforcement when compiling. It is designed so it can later grow into:
 
-- GPT-based section and bullet selection
-- automatic job description parsing
+- additional LLM providers beyond Anthropic
+- richer layout-aware fit checks beyond PDF page count
 - multiple CV templates
 - cover letter generation
 - application tracking
-- semantic matching between job descriptions and career bullets
+- deeper semantic matching between job descriptions and career bullets
 - Streamlit UI
 - SQLite migration if YAML becomes too limiting
 
-Those are intentionally not implemented yet.
+These are future enhancements, not requirements for the current YAML-first workflow.

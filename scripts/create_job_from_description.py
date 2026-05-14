@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -36,6 +37,8 @@ DEFAULT_CV_REQUIREMENTS = (
     "No extra user requirements were provided. Tailor the CV to the job description using "
     "the most relevant truthful evidence from the candidate inventory."
 )
+MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS = 2
+ONE_PAGE_LIMIT = 1
 LOCAL_ENV_FILES = [".env.local", ".env"]
 PASTE_END_MARKER = "END"
 LONGER_CV_PATTERNS = [
@@ -50,6 +53,7 @@ LONGER_CV_PATTERNS = [
     "more than one page",
     "more than 1 page",
 ]
+PROJECT_LINK_HOSTS = ("github", "devpost", "kaggle")
 
 
 class IntakeError(Exception):
@@ -93,6 +97,10 @@ def short_text_slug(text: str) -> str:
 
 def timestamped_job_id() -> str:
     return f"job_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+
+def job_config_folder_id(job_config: JobConfig) -> str:
+    return slugify(f"{job_config.company}_{job_config.role}")
 
 
 def resolve_job_description(args: argparse.Namespace) -> tuple[str, str]:
@@ -441,6 +449,27 @@ def validate_intake_payload(
     return job_config, selection
 
 
+def is_project_portfolio_link(link: Any) -> bool:
+    text = f"{link.label} {link.url}".lower()
+    return any(host in text for host in PROJECT_LINK_HOSTS)
+
+
+def validate_selected_project_links(database: CareerDatabase, selection: Selection) -> None:
+    projects_by_id = {project.id: project for project in database.projects}
+    missing_links: list[str] = []
+    for selected_project in selection.projects:
+        project = projects_by_id.get(selected_project.id)
+        if project is None:
+            continue
+        if not any(is_project_portfolio_link(link) for link in project.links):
+            missing_links.append(selected_project.id)
+    if missing_links:
+        raise IntakeError(
+            "Selected project(s) must have a GitHub, Devpost, or Kaggle link in master data: "
+            + ", ".join(missing_links)
+        )
+
+
 def write_job_files(
     job_folder: Path,
     job_description: str,
@@ -496,6 +525,27 @@ def append_revision_feedback(job_folder: Path, feedback: str) -> None:
         file.write(f"## {timestamp}\n\n{feedback.strip()}\n\n")
 
 
+def append_one_page_enforcement_prompt(
+    job_folder: Path,
+    attempt: int,
+    page_count: int,
+    system_prompt: str,
+    user_prompt: str,
+) -> None:
+    prompt_path = job_folder / "one_page_enforcement.md"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with prompt_path.open("a", encoding="utf-8") as file:
+        file.write(
+            f"## {timestamp} - Attempt {attempt}\n\n"
+            f"Detected PDF pages: {page_count}\n\n"
+            "# System Prompt\n\n"
+            + system_prompt.strip()
+            + "\n\n# User Prompt\n\n"
+            + user_prompt.strip()
+            + "\n\n"
+        )
+
+
 def write_revised_job_files(
     job_folder: Path,
     revision_feedback: str,
@@ -535,12 +585,136 @@ def generate_cv(job_folder: Path, database: CareerDatabase, job_config: JobConfi
     return job_output_path
 
 
+def pdf_path_for_tex(tex_path: Path) -> Path:
+    return tex_path.with_suffix(".pdf")
+
+
 def compile_pdf(tex_path: Path) -> None:
     subprocess.run(
         ["bash", str(ROOT / "scripts" / "compile_pdf.sh"), str(tex_path)],
         cwd=ROOT,
         check=True,
     )
+
+
+def count_pdf_pages(pdf_path: Path) -> int:
+    if not pdf_path.exists():
+        raise IntakeError(f"Compiled PDF was not found: {pdf_path}")
+
+    if not shutil.which("pdfinfo"):
+        raise IntakeError(
+            "Cannot determine compiled PDF page count because pdfinfo is not installed "
+            "or is not available on PATH."
+        )
+
+    try:
+        result = subprocess.run(
+            ["pdfinfo", str(pdf_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise IntakeError(
+            "Cannot determine compiled PDF page count because pdfinfo is not available on PATH."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        details = (exc.stderr or exc.stdout or "").strip()
+        message = f"Cannot determine compiled PDF page count with pdfinfo for {pdf_path}"
+        if details:
+            message += f": {details}"
+        raise IntakeError(message) from exc
+
+    match = re.search(r"^Pages:\s*(\d+)\s*$", result.stdout, flags=re.MULTILINE)
+    if not match:
+        raise IntakeError(
+            f"Cannot determine compiled PDF page count from pdfinfo output: {pdf_path}"
+        )
+    return int(match.group(1))
+
+
+def compile_pdf_and_count_pages(tex_path: Path) -> int:
+    compile_pdf(tex_path)
+    return count_pdf_pages(pdf_path_for_tex(tex_path))
+
+
+def build_one_page_enforcement_feedback(page_count: int, attempt: int) -> str:
+    return (
+        f"Automatic one-page PDF enforcement attempt {attempt}.\n\n"
+        f"The compiled CV PDF currently has {page_count} pages. This workflow requires "
+        "the final CV to fit on exactly one PDF page, so revise the complete job_config "
+        "and complete selection to make the rendered CV fit on one page.\n\n"
+        "Keep output_name unchanged. Set cv_length to \"one_page\". Reduce content by "
+        "removing the lowest-priority sections, items, bullets, skills, coursework, "
+        "education bullets, and inline technology lists as needed. Prefer fewer stronger "
+        "items over broad coverage. Return the full revised JSON object, not a patch."
+    )
+
+
+def enforce_one_page_pdf(
+    *,
+    job_folder: Path,
+    database: CareerDatabase,
+    job_description: str,
+    cv_requirements: str,
+    candidate_inventory: str,
+    system_prompt: str,
+    model: str,
+    job_config: JobConfig,
+    selection: Selection,
+    tex_path: Path,
+) -> tuple[Path, int]:
+    page_count = compile_pdf_and_count_pages(tex_path)
+
+    for attempt in range(1, MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS + 1):
+        if page_count <= ONE_PAGE_LIMIT:
+            return tex_path, page_count
+
+        print(
+            f"Compiled PDF has {page_count} pages; requesting one-page revision "
+            f"attempt {attempt}/{MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS}."
+        )
+        revision_feedback = build_one_page_enforcement_feedback(page_count, attempt)
+        user_prompt = render_prompt_template(
+            "job_refine_user.md.j2",
+            job_description=job_description,
+            cv_requirements=cv_requirements,
+            revision_feedback=revision_feedback,
+            current_job_config=yaml_text(job_config.model_dump(mode="json")),
+            current_selection=yaml_text(selection.model_dump(mode="json")),
+            candidate_inventory=candidate_inventory,
+        )
+        append_one_page_enforcement_prompt(
+            job_folder,
+            attempt,
+            page_count,
+            system_prompt,
+            user_prompt,
+        )
+        raw_response = call_anthropic(system_prompt, user_prompt, model)
+        payload = parse_llm_json(raw_response)
+        job_config, selection = validate_intake_payload(payload, allow_longer_cv=False)
+        validate_selected_project_links(database, selection)
+        write_revised_job_files(
+            job_folder,
+            revision_feedback,
+            system_prompt,
+            user_prompt,
+            payload,
+            job_config,
+            selection,
+        )
+        tex_path = generate_cv(job_folder, database, job_config, selection)
+        page_count = compile_pdf_and_count_pages(tex_path)
+
+    if page_count > ONE_PAGE_LIMIT:
+        raise IntakeError(
+            "One-page PDF enforcement failed after "
+            f"{MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS} revision attempts: "
+            f"{pdf_path_for_tex(tex_path)} still has {page_count} pages."
+        )
+
+    return tex_path, page_count
 
 
 def unique_job_folder(jobs_root: Path, requested_job_id: str) -> Path:
@@ -622,7 +796,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--compile-pdf",
         action="store_true",
-        help="Compile the generated TeX file to PDF after generation.",
+        help="Compile the generated TeX file to PDF and enforce a one-page result.",
     )
     parser.add_argument(
         "--cv-requirements",
@@ -644,8 +818,6 @@ def create_new_job(args: argparse.Namespace, master_data_path: Path) -> int:
     try:
         job_description, default_job_id = resolve_job_description(args)
         cv_requirements = resolve_cv_requirements(args)
-        job_id = slugify(args.job_id or default_job_id or timestamped_job_id())
-        job_folder = unique_job_folder(jobs_root, job_id)
         database = CareerDatabase.model_validate(load_yaml(master_data_path))
         candidate_inventory = build_candidate_inventory(database)
         system_prompt = render_prompt_template("job_intake_system.md")
@@ -657,6 +829,8 @@ def create_new_job(args: argparse.Namespace, master_data_path: Path) -> int:
         )
 
         if args.provider == "prompt-only":
+            job_id = slugify(args.job_id or default_job_id or timestamped_job_id())
+            job_folder = unique_job_folder(jobs_root, job_id)
             job_folder.mkdir(parents=True, exist_ok=False)
             (job_folder / "job_description.md").write_text(
                 job_description + "\n", encoding="utf-8"
@@ -678,6 +852,9 @@ def create_new_job(args: argparse.Namespace, master_data_path: Path) -> int:
             payload,
             allow_longer_cv=explicitly_requests_longer_cv(cv_requirements),
         )
+        validate_selected_project_links(database, selection)
+        job_id = slugify(args.job_id) if args.job_id else job_config_folder_id(job_config)
+        job_folder = unique_job_folder(jobs_root, job_id)
         write_job_files(
             job_folder,
             job_description,
@@ -689,8 +866,20 @@ def create_new_job(args: argparse.Namespace, master_data_path: Path) -> int:
             selection,
         )
         tex_path = generate_cv(job_folder, database, job_config, selection)
+        pdf_page_count: int | None = None
         if args.compile_pdf:
-            compile_pdf(tex_path)
+            tex_path, pdf_page_count = enforce_one_page_pdf(
+                job_folder=job_folder,
+                database=database,
+                job_description=job_description,
+                cv_requirements=cv_requirements,
+                candidate_inventory=candidate_inventory,
+                system_prompt=system_prompt,
+                model=args.model,
+                job_config=job_config,
+                selection=selection,
+                tex_path=tex_path,
+            )
     except (CvGenerationError, IntakeError, ValidationError, subprocess.CalledProcessError) as exc:
         print(f"Job intake failed: {exc}", file=sys.stderr)
         return 1
@@ -699,6 +888,8 @@ def create_new_job(args: argparse.Namespace, master_data_path: Path) -> int:
     print(f"Wrote CV TeX: {tex_path}")
     if args.compile_pdf:
         print(f"Compiled PDF next to: {tex_path}")
+        if pdf_page_count is not None:
+            print(f"Verified PDF page count: {pdf_page_count}")
     return 0
 
 
@@ -750,6 +941,7 @@ def refine_existing_job(args: argparse.Namespace, master_data_path: Path) -> int
             payload,
             allow_longer_cv=explicitly_requests_longer_cv(cv_requirements, revision_feedback),
         )
+        validate_selected_project_links(database, selection)
         write_revised_job_files(
             job_folder,
             revision_feedback,
@@ -760,8 +952,20 @@ def refine_existing_job(args: argparse.Namespace, master_data_path: Path) -> int
             selection,
         )
         tex_path = generate_cv(job_folder, database, job_config, selection)
+        pdf_page_count: int | None = None
         if args.compile_pdf:
-            compile_pdf(tex_path)
+            tex_path, pdf_page_count = enforce_one_page_pdf(
+                job_folder=job_folder,
+                database=database,
+                job_description=job_description,
+                cv_requirements=cv_requirements,
+                candidate_inventory=candidate_inventory,
+                system_prompt=system_prompt,
+                model=args.model,
+                job_config=job_config,
+                selection=selection,
+                tex_path=tex_path,
+            )
     except (CvGenerationError, IntakeError, ValidationError, subprocess.CalledProcessError) as exc:
         print(f"Job refinement failed: {exc}", file=sys.stderr)
         return 1
@@ -770,6 +974,8 @@ def refine_existing_job(args: argparse.Namespace, master_data_path: Path) -> int
     print(f"Regenerated CV TeX: {tex_path}")
     if args.compile_pdf:
         print(f"Compiled PDF next to: {tex_path}")
+        if pdf_page_count is not None:
+            print(f"Verified PDF page count: {pdf_page_count}")
     return 0
 
 

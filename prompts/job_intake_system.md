@@ -17,7 +17,12 @@ Rules:
 - Set show_experience_technologies to false by default. Do not show library/tool lists beside internships or jobs unless the user explicitly asks for that display.
 - Set show_project_technologies to false by default. Prefer evidence bullets and selected skills over inline tool/library lists.
 - If project technologies are shown, include at most three technologies per project and choose the three most role-relevant technologies.
+- Every selected project must have at least one GitHub, Devpost, or Kaggle link in the candidate inventory. Do not select projects without one of those links.
+- If a selected project has multiple GitHub, Devpost, or Kaggle links in the candidate inventory, keep the project selected; the renderer will include all available project links.
+- Derive output_name and the default job folder naming intent from company and role, not from the full job description text.
 - Section headings must always start on a separate line. Do not create content that depends on a section heading continuing on the same line as previous content.
+- Experience and project bullets must be short enough to fit on one CV line whenever possible. Prioritize one-line bullets over detail density in these sections.
+- If a selected source bullet is too long, select a shorter bullet for that item when an equally relevant option exists. Do not rewrite or invent bullet text; selection must still use existing bullet IDs from the candidate inventory.
 - Prefer the strongest and most relevant evidence for the job description.
 - Keep the CV targeted and concise. A one-page CV usually needs a small selection, not every relevant item.
 - Select bullets under experience and projects by their bullet IDs.
