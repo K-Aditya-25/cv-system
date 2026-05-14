@@ -38,6 +38,7 @@ DEFAULT_CV_REQUIREMENTS = (
     "the most relevant truthful evidence from the candidate inventory."
 )
 MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS = 2
+MAX_ONE_PAGE_LLM_ATTEMPTS = 2
 ONE_PAGE_LIMIT = 1
 LOCAL_ENV_FILES = [".env.local", ".env"]
 PASTE_END_MARKER = "END"
@@ -269,6 +270,7 @@ def compact_bullets(items: list[Any]) -> list[dict[str, Any]]:
                 or item_data.get("organization"),
                 "summary": item_data.get("summary") or item_data.get("description"),
                 "technologies": item_data.get("technologies", []),
+                "links": item_data.get("links", []),
                 "bullets": [
                     {
                         "id": bullet["id"],
@@ -638,8 +640,12 @@ def compile_pdf_and_count_pages(tex_path: Path) -> int:
     return count_pdf_pages(pdf_path_for_tex(tex_path))
 
 
-def build_one_page_enforcement_feedback(page_count: int, attempt: int) -> str:
-    return (
+def build_one_page_enforcement_feedback(
+    page_count: int,
+    attempt: int,
+    validation_error: str | None = None,
+) -> str:
+    feedback = (
         f"Automatic one-page PDF enforcement attempt {attempt}.\n\n"
         f"The compiled CV PDF currently has {page_count} pages. This workflow requires "
         "the final CV to fit on exactly one PDF page, so revise the complete job_config "
@@ -649,6 +655,23 @@ def build_one_page_enforcement_feedback(page_count: int, attempt: int) -> str:
         "education bullets, and inline technology lists as needed. Prefer fewer stronger "
         "items over broad coverage. Return the full revised JSON object, not a patch."
     )
+    if validation_error:
+        feedback += (
+            "\n\nThe previous automatic revision was rejected by validation:\n"
+            f"{validation_error}\n\n"
+            "Return a corrected one-page revision that satisfies every schema and selection rule."
+        )
+    return feedback
+
+
+def should_retry_llm_revision_error(error: IntakeError) -> bool:
+    message = str(error)
+    non_retryable_prefixes = (
+        "ANTHROPIC_API_KEY",
+        "Anthropic API request failed",
+        "Anthropic API response did not contain text",
+    )
+    return not message.startswith(non_retryable_prefixes)
 
 
 def enforce_one_page_pdf(
@@ -674,27 +697,45 @@ def enforce_one_page_pdf(
             f"Compiled PDF has {page_count} pages; requesting one-page revision "
             f"attempt {attempt}/{MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS}."
         )
-        revision_feedback = build_one_page_enforcement_feedback(page_count, attempt)
-        user_prompt = render_prompt_template(
-            "job_refine_user.md.j2",
-            job_description=job_description,
-            cv_requirements=cv_requirements,
-            revision_feedback=revision_feedback,
-            current_job_config=yaml_text(job_config.model_dump(mode="json")),
-            current_selection=yaml_text(selection.model_dump(mode="json")),
-            candidate_inventory=candidate_inventory,
-        )
-        append_one_page_enforcement_prompt(
-            job_folder,
-            attempt,
-            page_count,
-            system_prompt,
-            user_prompt,
-        )
-        raw_response = call_anthropic(system_prompt, user_prompt, model)
-        payload = parse_llm_json(raw_response)
-        job_config, selection = validate_intake_payload(payload, allow_longer_cv=False)
-        validate_selected_project_links(database, selection)
+        validation_error: str | None = None
+        for llm_attempt in range(1, MAX_ONE_PAGE_LLM_ATTEMPTS + 1):
+            revision_feedback = build_one_page_enforcement_feedback(
+                page_count,
+                attempt,
+                validation_error,
+            )
+            user_prompt = render_prompt_template(
+                "job_refine_user.md.j2",
+                job_description=job_description,
+                cv_requirements=cv_requirements,
+                revision_feedback=revision_feedback,
+                current_job_config=yaml_text(job_config.model_dump(mode="json")),
+                current_selection=yaml_text(selection.model_dump(mode="json")),
+                candidate_inventory=candidate_inventory,
+            )
+            append_one_page_enforcement_prompt(
+                job_folder,
+                attempt,
+                page_count,
+                system_prompt,
+                user_prompt,
+            )
+            raw_response = call_anthropic(system_prompt, user_prompt, model)
+            try:
+                payload = parse_llm_json(raw_response)
+                job_config, selection = validate_intake_payload(payload, allow_longer_cv=False)
+                validate_selected_project_links(database, selection)
+                break
+            except IntakeError as exc:
+                if not should_retry_llm_revision_error(exc) or (
+                    llm_attempt == MAX_ONE_PAGE_LLM_ATTEMPTS
+                ):
+                    raise
+                validation_error = str(exc)
+                print(
+                    "One-page revision failed validation; requesting corrected "
+                    f"revision {llm_attempt + 1}/{MAX_ONE_PAGE_LLM_ATTEMPTS}."
+                )
         write_revised_job_files(
             job_folder,
             revision_feedback,
