@@ -1,105 +1,30 @@
 # Programmatic CV Generation System
 
-This project is an MVP for maintaining one structured career database and generating tailored CVs from it.
+This project maintains one structured career database and generates tailored CVs from it.
 
-The core workflow is:
-
-```text
-career database + job description + job config + selection file -> tailored LaTeX CV -> PDF
-```
-
-The v1 workflow adds an optional intake layer:
+The main workflow is:
 
 ```text
-job description + career database -> LLM-selected job files -> tailored LaTeX CV -> PDF
+career data + job-specific selection -> LaTeX CV -> PDF
 ```
 
-The master career database is the source of truth. CVs are generated artifacts. A generated CV should never invent information: it should only use selected IDs and bullet IDs that already exist in the configured master data file.
-
-## What This Is
-
-This is a simple, practical CV generation system built with:
-
-- Python
-- `uv` for Python versions, environments, dependencies, locking, and running scripts
-- YAML for career data and job-specific selections
-- Pydantic v2 for validation
-- Jinja2 for rendering LaTeX
-- LaTeX for PDF output
-- optional LLM API calls for job intake and selection automation
-
-This is not a web app. It does not use PostgreSQL or a complex database. YAML is intentionally used first because it is readable, Git-friendly, and easy to edit.
-
-## Data Privacy
-
-Your real career database should stay private. This repo is designed so the code, schema, templates, and fake example data can be public, while your real career data remains local.
-
-- `data/master.example.yaml` is safe dummy data committed to the repo.
-- `data/master.private.yaml` is your real local career database and is ignored by Git.
-- `data/master.yaml` is also ignored for compatibility if you prefer that local filename.
-- `data/raw_inputs/*` is ignored so old CVs, LinkedIn exports, and notes are not uploaded.
-- `.env` and `.env.*` are ignored so local API keys are not uploaded.
-
-When using the LLM intake workflow, the configured provider receives the job description and a compact candidate inventory containing career IDs, skills, bullet text, tags, and strengths. Use the manual workflow for roles or data you do not want to send to an external API.
-
-The API key is not included in prompts, job files, or generated CVs. The intake script reads `ANTHROPIC_API_KEY` from the process environment, `.env.local`, or `.env`, and those env files are ignored by Git. Do not paste API keys into job descriptions, prompt files, YAML files, or chat messages.
-
-By default, scripts use `data/master.example.yaml`. To use your private file locally, set:
-
-```bash
-CV_MASTER_DATA=data/master.private.yaml uv run python scripts/validate_data.py
-CV_MASTER_DATA=data/master.private.yaml uv run python scripts/generate_cv.py jobs/my_real_job_folder
-```
-
-The scripts also accept `CVMasterData` as a compatibility alias, but `CV_MASTER_DATA` is recommended for shell use.
-
-## Folder Structure
+The automated workflow can also use Claude through the Anthropic API:
 
 ```text
-cv-system/
-  README.md
-  pyproject.toml
-  uv.lock
-  .python-version
-  data/
-    master.example.yaml
-    master.private.yaml   # local only, ignored by Git
-    raw_inputs/
-      README.md
-  schemas/
-    career_schema.py
-  templates/
-    cv_template.tex.j2
-  prompts/
-    job_intake_system.md
-    job_intake_user.md.j2
-    job_refine_user.md.j2
-  jobs/
-    example_technical_ml_role/
-      job_config.yaml
-      job_description.md
-      selection.yaml
-    example_startup_events_role/
-      job_config.yaml
-      job_description.md
-      selection.yaml
-  scripts/
-    validate_data.py
-    create_job_from_description.py
-    generate_cv.py
-    compile_pdf.sh
-  outputs/
+job description + career data -> tailored job folder -> LaTeX CV -> PDF
 ```
 
-## Setup With uv
+The career database is the source of truth. Generated CVs should only use facts, IDs, and bullet IDs that already exist in the configured master data file.
 
-Install `uv` if needed:
+## What You Need
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+- Python 3.12
+- `uv`
+- A LaTeX compiler for PDFs: `latexmk`, `tectonic`, or `pdflatex`
+- Optional: `pdfinfo` for one-page PDF checks
+- Optional: `ANTHROPIC_API_KEY` for Claude-powered job intake and refinement
 
-Install Python 3.12, create the environment, and sync dependencies:
+Install and sync the Python environment:
 
 ```bash
 uv python install 3.12
@@ -107,68 +32,64 @@ uv venv
 uv sync
 ```
 
-The scripts do not require manual virtual environment activation. Run them through `uv run`.
+The scripts are run through `uv run`; you do not need to activate the virtual environment manually.
 
-## Validate Data
+## Data Files
 
-```bash
-uv run python scripts/validate_data.py
+By default, commands use the safe example data:
+
+```text
+data/master.example.yaml
 ```
 
-This validates the configured master data file using the Pydantic models in `schemas/career_schema.py`. By default, it validates `data/master.example.yaml`. To validate your private database:
+For real CVs, use your private local data file:
+
+```text
+data/master.private.yaml
+```
+
+That private file is ignored by Git. Use `CV_MASTER_DATA` to point commands at it:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml uv run python scripts/validate_data.py
 ```
 
-## Generate CVs
+## Run The Project
 
-Generate the technical ML/software example:
-
-```bash
-uv run python scripts/generate_cv.py jobs/example_technical_ml_role
-```
-
-This uses `data/master.example.yaml` unless `CV_MASTER_DATA` is set.
-
-Expected files:
-
-```text
-jobs/example_technical_ml_role/exampletech_ml_engineer_cv.tex
-outputs/exampletech_ml_engineer_cv.tex
-```
-
-Generate the startup/events/community example:
+Validate the example data:
 
 ```bash
-uv run python scripts/generate_cv.py jobs/example_startup_events_role
+uv run python scripts/validate_data.py
 ```
 
-Expected files:
+Validate your private data:
 
-```text
-jobs/example_startup_events_role/communityforge_startup_events_cv.tex
-outputs/communityforge_startup_events_cv.tex
+```bash
+CV_MASTER_DATA=data/master.private.yaml uv run python scripts/validate_data.py
 ```
 
-## V1: One-Shot Job Intake With Claude
+Generate a CV from an existing local job folder:
 
-The v1 intake command creates a new job folder from pasted job description text. It can either call Claude through the Anthropic API for job parsing and selection, or run in prompt-only mode so you can inspect the exact prompt package before making an LLM call.
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/generate_cv.py jobs/my_real_job_folder
+```
 
-- `job_description.md`
-- `llm_prompt.md`
-- `job_config.yaml`
-- `selection.yaml`
-- `job_summary.txt`
-- `selection_rationale.md`
-- generated `.tex` CV
-- optional compiled `.pdf`
+To test with non-private data, create a local job folder whose `selection.yaml` uses IDs from `data/master.example.yaml`, then run:
 
-In automatic Claude mode, job folders are named from the generated company and role, for example `acme_software_engineer`. If a folder already exists, the script appends a numeric suffix. Use `--job-id` only when you want to override that default.
+```bash
+uv run python scripts/generate_cv.py jobs/my_local_example_job
+```
 
-Claude credits work for this workflow if they are Anthropic API credits and you have an `ANTHROPIC_API_KEY`. A Claude app subscription by itself is not usually an API key.
+Compile a generated CV to PDF:
 
-Store the key in an ignored local env file:
+```bash
+bash scripts/compile_pdf.sh jobs/my_real_job_folder/generated_cv_name.tex
+```
+
+## Claude Job Intake
+
+Store your Anthropic API key in an ignored local env file:
 
 ```bash
 read -s ANTHROPIC_API_KEY
@@ -176,14 +97,7 @@ printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY" > .env.local
 unset ANTHROPIC_API_KEY
 ```
 
-Or load it for one terminal session without putting it directly in the command you run:
-
-```bash
-read -s ANTHROPIC_API_KEY
-export ANTHROPIC_API_KEY
-```
-
-Interactive mode is the intended no-file workflow. You run one command, paste the LinkedIn job description, type `END`, paste any CV preferences, then type `END` again:
+Create a job-specific CV interactively from a pasted job description:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml \
@@ -193,31 +107,9 @@ uv run python scripts/create_job_from_description.py \
   --compile-pdf
 ```
 
-You can also paste a job description directly into a single command and provide preferences inline:
+In interactive mode, paste the job description, type `END`, paste any CV preferences, then type `END` again.
 
-```bash
-CV_MASTER_DATA=data/master.private.yaml \
-uv run python scripts/create_job_from_description.py \
-  --job-description-text "Paste the LinkedIn job description here" \
-  --job-id acme_software_engineer \
-  --provider anthropic \
-  --cv-requirements "Keep it to one page. Prioritize backend ML systems. Omit weakly relevant sections." \
-  --compile-pdf
-```
-
-For long job descriptions, stdin avoids shell quoting:
-
-```bash
-CV_MASTER_DATA=data/master.private.yaml \
-pbpaste | uv run python scripts/create_job_from_description.py \
-  --job-description-stdin \
-  --job-id acme_software_engineer \
-  --provider anthropic \
-  --cv-requirements "Keep it to one page and emphasize production engineering." \
-  --compile-pdf
-```
-
-Prompt-only mode writes the exact prompt package without calling an LLM. This is useful when you want to inspect what would be sent to Claude, keep the workflow manual, or run the prompt elsewhere:
+Use prompt-only mode when you want to inspect the prompt without calling Claude:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml \
@@ -226,346 +118,19 @@ uv run python scripts/create_job_from_description.py \
   --provider prompt-only
 ```
 
-The file-based workflow still works if you want repeatable source files:
-
-```bash
-CV_MASTER_DATA=data/master.private.yaml \
-uv run python scripts/create_job_from_description.py data/raw_inputs/acme_job.md \
-  --job-id acme_software_engineer \
-  --provider anthropic \
-  --cv-requirements-file data/raw_inputs/acme_cv_requirements.md \
-  --compile-pdf
-```
-
-The default Claude model is set in `scripts/create_job_from_description.py`. Override it without editing code by setting `CV_LLM_MODEL`.
-
-If the LLM returns invalid IDs or malformed JSON, the script fails before writing the generated YAML/CV. Re-run in prompt-only mode to inspect the generated prompt, or adjust the prompt templates under `prompts/`.
-
-Per-job CV requirements can be supplied interactively, inline with `--cv-requirements`, or from a file with `--cv-requirements-file`. Use these for any job-specific preference that should influence the generated CV, including section inclusion or exclusion, content emphasis, section ordering, tone, length, or constraints on what not to mention. The script saves the resolved requirements to `cv_requirements.md` inside the generated job folder.
-
-Default v1 styling/content behavior:
-
-- CV length is set to `one_page` unless your requirements or refinement feedback explicitly ask for a longer CV
-- when `--compile-pdf` is used, the script verifies the compiled PDF is one page and can ask Claude for a shorter revised selection if it is too long
-- education stays compact
-- coursework is hidden unless explicitly requested or unusually relevant
-- education bullets are hidden unless explicitly requested or unusually relevant
-- internship/job technology lists are hidden by default
-- project technology lists are hidden by default and capped at three items when shown
-- every selected project must have at least one GitHub, Devpost, or Kaggle link in master data
-- all available GitHub, Devpost, and Kaggle project links are rendered when present
-- experience and project bullets should be selected with one-line rendered length as a priority
-- section headings are forced onto separate lines by the LaTeX template
-
-To iterate on a generated CV, refine the existing job folder with feedback instead of starting over:
+Refine an existing generated job folder:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml \
 uv run python scripts/create_job_from_description.py \
-  --refine-job jobs/acme_software_engineer \
+  --refine-job jobs/my_real_job_folder \
   --interactive \
   --provider anthropic \
   --compile-pdf
 ```
 
-The script will ask for revision feedback. Example feedback:
+When `--compile-pdf` is used, the intake workflow compiles the CV, checks that the PDF is one page, and can ask Claude for a shorter revised selection if the result is too long.
 
-```text
-Make education shorter.
-Remove certifications.
-Use stronger backend evidence.
-Do not mention tools beside internships.
-END
-```
+## More Detail
 
-For a one-command refinement:
-
-```bash
-CV_MASTER_DATA=data/master.private.yaml \
-uv run python scripts/create_job_from_description.py \
-  --refine-job jobs/acme_software_engineer \
-  --feedback "Remove certifications, shorten education, and use stronger backend bullets." \
-  --provider anthropic \
-  --compile-pdf
-```
-
-Refinement updates `job_config.yaml`, `selection.yaml`, `job_summary.txt`, `selection_rationale.md`, and the generated CV. It also appends your feedback to `revision_feedback.md` and writes the latest refinement prompt to `llm_refine_prompt.md`. Use `--provider prompt-only` with `--refine-job` to write only the refinement prompt without calling Claude.
-
-## Compile PDF
-
-Compile a generated `.tex` file:
-
-```bash
-bash scripts/compile_pdf.sh jobs/example_technical_ml_role/exampletech_ml_engineer_cv.tex
-```
-
-The script uses `latexmk -pdf` if available, then `tectonic`, then `pdflatex`. If none are installed, it prints a helpful error.
-
-## How the Files Work
-
-### Master Data Files
-
-The structured career database can live in either:
-
-- `data/master.example.yaml`: safe public sample data
-- `data/master.private.yaml`: real private data, ignored by Git
-- any other path passed through `CV_MASTER_DATA`
-
-The master data includes:
-
-- `profile`
-- `education`
-- `experience`
-- `projects`
-- `skills`
-- `volunteering`
-- `leadership`
-- `achievements`
-- `certifications`
-- `custom_sections`
-
-Every reusable item has an `id`. Bullets also have IDs. Job-specific CVs refer to these IDs from `selection.yaml`.
-
-The example job folders use IDs from `data/master.example.yaml`. Your real job folders should use IDs from your private data file.
-
-### Job Folders
-
-Each job folder contains:
-
-- `job_config.yaml`: positioning, variant, template, output name, section order
-- `job_description.md`: pasted job description or notes
-- `selection.yaml`: deterministic list of selected education, experience, projects, bullets, skills, and custom section items
-
-Create a new job by copying one of the example folders and editing the files.
-
-## Editing the Career Database
-
-### Add Education
-
-Add a new item under `education` in your private master data file with an ID:
-
-```yaml
-education:
-  - id: university_msc_data_science
-    institution: "Example University"
-    location: "Dublin, Ireland"
-    degree: "MSc Data Science"
-    start_date: "2026"
-    end_date: "2027"
-    grade: "Distinction expected"
-    coursework:
-      - Machine Learning
-      - Statistical Modelling
-    bullets:
-      - id: thesis_forecasting
-        text: "Completed a thesis on probabilistic forecasting for operational datasets."
-        tags: [machine-learning, forecasting]
-        strength: 4
-```
-
-Then select it in a job folder:
-
-```yaml
-education:
-  - university_msc_data_science
-```
-
-### Add Experience
-
-Add a new item under `experience`. Keep bullets atomic and reusable:
-
-```yaml
-experience:
-  - id: software_engineering_intern_newco
-    company: "NewCo"
-    title: "Software Engineering Intern"
-    location: "London, UK"
-    start_date: "Jun 2026"
-    end_date: "Sep 2026"
-    summary: "Built backend tooling for internal analytics workflows."
-    technologies: [Python, FastAPI, Docker]
-    bullets:
-      - id: backend_api_delivery
-        text: "Implemented FastAPI endpoints used by analysts to query operational metrics."
-        tags: [backend, api, analytics]
-        strength: 4
-```
-
-Select the experience and specific bullets:
-
-```yaml
-experience:
-  - id: software_engineering_intern_newco
-    bullets:
-      - backend_api_delivery
-```
-
-### Add Projects
-
-Add projects under `projects` with links and selectable bullets:
-
-```yaml
-projects:
-  - id: ml_recommendation_service
-    name: "ML Recommendation Service"
-    date: "2026"
-    category: "machine_learning"
-    subtitle: "Personal project"
-    description: "Built a small recommendation API with offline evaluation."
-    technologies: [Python, scikit-learn, FastAPI]
-    links:
-      - label: "GitHub"
-        url: "https://github.com/example/recommendation-service"
-    bullets:
-      - id: ranking_evaluation
-        text: "Compared ranking models using precision@k and recall@k on held-out interactions."
-        tags: [machine-learning, evaluation]
-        strength: 5
-```
-
-### Add Skills
-
-Skills are category-based and dynamic. Category names are not hardcoded in the LaTeX template.
-
-```yaml
-skills:
-  programming_languages:
-    - Python
-    - TypeScript
-  machine_learning:
-    - PyTorch
-    - scikit-learn
-```
-
-Select only the relevant skills for a job:
-
-```yaml
-skills:
-  programming_languages:
-    - Python
-  machine_learning:
-    - PyTorch
-```
-
-### Add Custom Sections
-
-Use `custom_sections` for anything that does not fit neatly into the fixed sections.
-
-```yaml
-custom_sections:
-  leadership_volunteering_outreach:
-    title: "Leadership, Volunteering & Outreach"
-    items:
-      - id: technical_blog_writer
-        text: "Technical Blog Writer: published tutorials on machine learning project work."
-        tags: [writing, technical-communication]
-        strength: 4
-```
-
-Select custom section items by ID:
-
-```yaml
-custom_sections:
-  leadership_volunteering_outreach:
-    - technical_blog_writer
-```
-
-## CV Variants
-
-`job_config.yaml` supports these initial variants:
-
-- `technical_ml`
-- `software_engineering`
-- `data_science`
-- `startup_events`
-- `leadership_community`
-- `general`
-
-Variants influence default behavior when `sections_order` is missing. For example, `technical_ml` puts technical skills near the top, while `startup_events` includes profile and outreach-oriented custom sections.
-
-Explicit `sections_order` always wins:
-
-```yaml
-sections_order:
-  - education
-  - technical_skills
-  - experience
-  - projects
-  - achievements
-  - certifications
-```
-
-Use `technical_skills` when you want the skills section heading to read "Technical Skills". Use `skills` when you want the heading to read "Skills". Both render the selected skill categories dynamically.
-
-## LaTeX Template
-
-The default template is `templates/cv_template.tex.j2`.
-
-It is intentionally compact, single-column, ATS-friendly, and LaTeX-native:
-
-- centered candidate name
-- centered contact and profile links
-- dark blue section accent
-- no sidebars
-- no photos
-- no graphics-heavy layout
-- flexible section ordering
-- dynamic skills categories
-- generic custom sections
-
-Special LaTeX characters in plain text are escaped by the generator. URLs are handled separately for `hyperref`.
-
-## Troubleshooting
-
-`Selected ID does not exist`
-
-Check that the ID in `selection.yaml` exactly matches an ID in the master data file currently being used. If you are using private data, confirm `CV_MASTER_DATA=data/master.private.yaml` is set.
-
-`Selected bullet does not belong to selected item`
-
-Bullet IDs are scoped to their parent experience or project. Confirm the bullet is listed under the selected item in the configured master data file.
-
-`Selected skill does not exist`
-
-Skills must first be listed in the configured master data file, then selected by category in `selection.yaml`.
-
-`Template not found`
-
-Confirm `template` in `job_config.yaml` matches a file in `templates/`.
-
-`No LaTeX compiler found`
-
-Install `latexmk`, `tectonic`, or `pdflatex`. On macOS, MacTeX is the common full LaTeX distribution; Tectonic is a lighter alternative.
-
-`The example jobs work, but my private jobs fail`
-
-The example jobs are wired to `data/master.example.yaml`. Real job folders need selections that reference IDs in your private data. Run private jobs like this:
-
-```bash
-CV_MASTER_DATA=data/master.private.yaml uv run python scripts/generate_cv.py jobs/my_real_job_folder
-```
-
-## Recommended Future Data Ingestion Workflow
-
-1. Collect old CVs, LinkedIn text, project notes, GitHub README text, and certificates.
-2. Convert PDFs to text manually or with a tool.
-3. Place raw text in `data/raw_inputs/`.
-4. Ask GPT/Codex to extract unique reusable career information into `data/master.private.yaml`.
-5. Validate with `CV_MASTER_DATA=data/master.private.yaml uv run python scripts/validate_data.py`.
-6. Review manually.
-7. Keep `data/master.private.yaml` local; commit only code, templates, schemas, and sanitized examples.
-
-## Future Extensions
-
-This MVP already has Anthropic-backed v1 job intake, basic job parsing and selection, prompt-only prompt export, refinement, and one-page PDF enforcement when compiling. It is designed so it can later grow into:
-
-- additional LLM providers beyond Anthropic
-- richer layout-aware fit checks beyond PDF page count
-- multiple CV templates
-- cover letter generation
-- application tracking
-- deeper semantic matching between job descriptions and career bullets
-- Streamlit UI
-- SQLite migration if YAML becomes too limiting
-
-These are future enhancements, not requirements for the current YAML-first workflow.
+Backend details, file formats, data modeling guidance, prompt behavior, troubleshooting, and future extension notes live in [docs/project-details.md](docs/project-details.md).
