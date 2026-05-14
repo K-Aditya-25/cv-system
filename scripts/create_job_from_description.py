@@ -31,7 +31,7 @@ from scripts.generate_cv import (  # noqa: E402
 )
 
 
-DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_CV_REQUIREMENTS = (
     "No extra user requirements were provided. Tailor the CV to the job description using "
@@ -456,7 +456,10 @@ def is_project_portfolio_link(link: Any) -> bool:
     return any(host in text for host in PROJECT_LINK_HOSTS)
 
 
-def validate_selected_project_links(database: CareerDatabase, selection: Selection) -> None:
+def selected_projects_without_portfolio_links(
+    database: CareerDatabase,
+    selection: Selection,
+) -> list[str]:
     projects_by_id = {project.id: project for project in database.projects}
     missing_links: list[str] = []
     for selected_project in selection.projects:
@@ -465,10 +468,20 @@ def validate_selected_project_links(database: CareerDatabase, selection: Selecti
             continue
         if not any(is_project_portfolio_link(link) for link in project.links):
             missing_links.append(selected_project.id)
+    return missing_links
+
+
+def warn_selected_projects_without_portfolio_links(
+    database: CareerDatabase,
+    selection: Selection,
+) -> None:
+    missing_links = selected_projects_without_portfolio_links(database, selection)
     if missing_links:
-        raise IntakeError(
-            "Selected project(s) must have a GitHub, Devpost, or Kaggle link in master data: "
-            + ", ".join(missing_links)
+        print(
+            "Warning: selected project(s) do not have a GitHub, Devpost, or Kaggle "
+            "link in master data and will render without project links: "
+            + ", ".join(missing_links),
+            file=sys.stderr,
         )
 
 
@@ -724,7 +737,7 @@ def enforce_one_page_pdf(
             try:
                 payload = parse_llm_json(raw_response)
                 job_config, selection = validate_intake_payload(payload, allow_longer_cv=False)
-                validate_selected_project_links(database, selection)
+                warn_selected_projects_without_portfolio_links(database, selection)
                 break
             except IntakeError as exc:
                 if not should_retry_llm_revision_error(exc) or (
@@ -893,7 +906,7 @@ def create_new_job(args: argparse.Namespace, master_data_path: Path) -> int:
             payload,
             allow_longer_cv=explicitly_requests_longer_cv(cv_requirements),
         )
-        validate_selected_project_links(database, selection)
+        warn_selected_projects_without_portfolio_links(database, selection)
         job_id = slugify(args.job_id) if args.job_id else job_config_folder_id(job_config)
         job_folder = unique_job_folder(jobs_root, job_id)
         write_job_files(
@@ -982,7 +995,7 @@ def refine_existing_job(args: argparse.Namespace, master_data_path: Path) -> int
             payload,
             allow_longer_cv=explicitly_requests_longer_cv(cv_requirements, revision_feedback),
         )
-        validate_selected_project_links(database, selection)
+        warn_selected_projects_without_portfolio_links(database, selection)
         write_revised_job_files(
             job_folder,
             revision_feedback,

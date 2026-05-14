@@ -17,7 +17,8 @@ Rules:
 - Set show_experience_technologies to false by default. Do not show library/tool lists beside internships or jobs unless the user explicitly asks for that display.
 - Set show_project_technologies to false by default. Prefer evidence bullets and selected skills over inline tool/library lists.
 - If project technologies are shown, include at most three technologies per project and choose the three most role-relevant technologies.
-- Every selected project must have at least one GitHub, Devpost, or Kaggle link in the candidate inventory. Do not select projects without one of those links.
+- Prefer selected projects that have at least one GitHub, Devpost, or Kaggle link in the candidate inventory when relevance is otherwise comparable.
+- If an unlinked project is the strongest evidence for the job description, it may be selected; the renderer will show the project without a clickable project link.
 - If a selected project has multiple GitHub, Devpost, or Kaggle links in the candidate inventory, keep the project selected; the renderer will include all available project links.
 - Derive output_name and the default job folder naming intent from company and role, not from the full job description text.
 - Section headings must always start on a separate line. Do not create content that depends on a section heading continuing on the same line as previous content.
