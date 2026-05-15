@@ -5,6 +5,7 @@ import copy
 import os
 import re
 import sys
+from calendar import monthrange
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from schemas.career_schema import CareerDatabase, JobConfig, Selection  # noqa: 
 
 
 DEFAULT_MASTER_DATA_PATH = ROOT / "data" / "master.example.yaml"
+DEFAULT_PAGE_MARGIN = "0.55in"
 
 
 DEFAULT_SECTION_ORDERS: dict[str, list[str]] = {
@@ -103,6 +105,49 @@ LATEX_REPLACEMENTS = {
     "~": r"\textasciitilde{}",
     "^": r"\textasciicircum{}",
     "€": r"\texteuro{}",
+}
+
+CURRENT_DATE_MARKERS = {
+    "current",
+    "now",
+    "ongoing",
+    "present",
+    "to date",
+}
+
+MONTHS = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+
+SEASONS = {
+    "spring": 5,
+    "summer": 8,
+    "autumn": 11,
+    "fall": 11,
+    "winter": 12,
 }
 
 
@@ -214,6 +259,81 @@ def select_items_with_bullets(
     return selected
 
 
+def parse_recency_date(value: Any) -> tuple[int, int, int] | None:
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    normalized = re.sub(r"\s+", " ", text.lower())
+    if normalized in CURRENT_DATE_MARKERS:
+        return (9999, 12, 31)
+
+    if re.fullmatch(r"\d{4}-\d{1,2}-\d{1,2}", normalized):
+        year_text, month_text, day_text = normalized.split("-")
+        year = int(year_text)
+        month = int(month_text)
+        day = int(day_text)
+        if 1 <= month <= 12 and 1 <= day <= monthrange(year, month)[1]:
+            return (year, month, day)
+        return None
+
+    if re.fullmatch(r"\d{4}-\d{1,2}", normalized):
+        year_text, month_text = normalized.split("-")
+        year = int(year_text)
+        month = int(month_text)
+        if 1 <= month <= 12:
+            return (year, month, monthrange(year, month)[1])
+        return None
+
+    month_year_match = re.fullmatch(
+        r"([a-z]+)\.?\s+(\d{4})|(\d{4})\s+([a-z]+)\.?", normalized
+    )
+    if month_year_match:
+        month_name = month_year_match.group(1) or month_year_match.group(4)
+        year = int(month_year_match.group(2) or month_year_match.group(3))
+        month = MONTHS.get(month_name)
+        if month:
+            return (year, month, monthrange(year, month)[1])
+
+    season_year_match = re.fullmatch(r"([a-z]+)\s+(\d{4})", normalized)
+    if season_year_match:
+        season = SEASONS.get(season_year_match.group(1))
+        if season:
+            year = int(season_year_match.group(2))
+            return (year, season, monthrange(year, season)[1])
+
+    if re.fullmatch(r"\d{4}", normalized):
+        return (int(normalized), 12, 31)
+
+    year_matches = re.findall(r"\b(19\d{2}|20\d{2}|21\d{2})\b", normalized)
+    if year_matches:
+        year = max(int(year) for year in year_matches)
+        return (year, 12, 31)
+
+    return None
+
+
+def recency_sort_key(item: dict[str, Any], section_name: str) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+    if section_name == "experience":
+        primary_date = parse_recency_date(item.get("end_date"))
+        secondary_date = parse_recency_date(item.get("start_date"))
+    elif section_name == "projects":
+        primary_date = parse_recency_date(item.get("date"))
+        secondary_date = None
+    else:
+        raise CvGenerationError(f"Unsupported recency-sorted section: {section_name}")
+
+    unknown = (0, 0, 0)
+    return primary_date or unknown, secondary_date or unknown
+
+
+def sort_by_recency(items: list[dict[str, Any]], section_name: str) -> list[dict[str, Any]]:
+    return sorted(items, key=lambda item: recency_sort_key(item, section_name), reverse=True)
+
+
 def select_skills(
     selected_skills: dict[str, list[str]],
     available_skills: dict[str, list[str]],
@@ -280,10 +400,14 @@ def build_render_context(
         "profile": database_copy.profile.model_dump(),
         "job": job_config.model_dump(),
         "education": select_simple_items(selection.education, database_copy.education, "education"),
-        "experience": select_items_with_bullets(
-            selection.experience, database_copy.experience, "experience"
+        "experience": sort_by_recency(
+            select_items_with_bullets(selection.experience, database_copy.experience, "experience"),
+            "experience",
         ),
-        "projects": select_items_with_bullets(selection.projects, database_copy.projects, "projects"),
+        "projects": sort_by_recency(
+            select_items_with_bullets(selection.projects, database_copy.projects, "projects"),
+            "projects",
+        ),
         "skills": select_skills(selection.skills, database_copy.skills),
         "volunteering": select_simple_items(
             selection.volunteering, database_copy.volunteering, "volunteering"
@@ -309,6 +433,7 @@ def build_render_context(
     for key, section in selected_context["custom_sections"].items():
         section_titles[key] = section["title"]
     selected_context["section_titles"] = section_titles
+    selected_context["default_page_margin"] = DEFAULT_PAGE_MARGIN
     return selected_context
 
 

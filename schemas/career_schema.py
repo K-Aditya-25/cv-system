@@ -248,6 +248,7 @@ class JobConfig(StrictBaseModel):
     include_education_bullets: bool = False
     show_experience_technologies: bool = False
     show_project_technologies: bool = False
+    page_margin: str | None = None
 
 
 def ensure_unique_ids(items: list[object], section_name: str) -> None:

@@ -1,7 +1,9 @@
 {% raw %}
 \documentclass[10pt,a4paper]{article}
 
-\usepackage[margin=0.55in]{geometry}
+{% endraw %}
+\usepackage[margin={{ job.page_margin or default_page_margin }}]{geometry}
+{% raw %}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}

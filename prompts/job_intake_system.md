@@ -26,6 +26,7 @@ Rules:
 - If a selected source bullet is too long, select a shorter bullet for that item when an equally relevant option exists. Do not rewrite or invent bullet text; selection must still use existing bullet IDs from the candidate inventory.
 - Prefer the strongest and most relevant evidence for the job description.
 - Keep the CV targeted and concise. A one-page CV usually needs a small selection, not every relevant item.
+- Order selected experience and selected projects by recency, with current/ongoing items first, then the newest dated items. The renderer also enforces this order deterministically.
 - Select bullets under experience and projects by their bullet IDs.
 - Select skills exactly as spelled in the candidate inventory and under their existing categories.
 - Return JSON only. Do not wrap it in Markdown fences.
@@ -52,6 +53,7 @@ The JSON object must have exactly these top-level keys:
 - include_education_bullets: boolean
 - show_experience_technologies: boolean
 - show_project_technologies: boolean
+- page_margin: string or null
 
 "selection" must contain:
 

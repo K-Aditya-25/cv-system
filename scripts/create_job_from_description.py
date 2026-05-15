@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 from schemas.career_schema import CareerDatabase, JobConfig, Selection  # noqa: E402
 from scripts.generate_cv import (  # noqa: E402
     CvGenerationError,
+    DEFAULT_PAGE_MARGIN,
     build_render_context,
     load_yaml,
     render_cv,
@@ -37,8 +38,9 @@ DEFAULT_CV_REQUIREMENTS = (
     "No extra user requirements were provided. Tailor the CV to the job description using "
     "the most relevant truthful evidence from the candidate inventory."
 )
-MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS = 2
-MAX_ONE_PAGE_LLM_ATTEMPTS = 2
+MAX_COMPILE_PDF_LLM_CALLS = 2
+INITIAL_INTAKE_LLM_CALLS = 1
+MAX_AUTOMATIC_ONE_PAGE_LLM_CALLS = MAX_COMPILE_PDF_LLM_CALLS - INITIAL_INTAKE_LLM_CALLS
 ONE_PAGE_LIMIT = 1
 LOCAL_ENV_FILES = [".env.local", ".env"]
 PASTE_END_MARKER = "END"
@@ -268,6 +270,9 @@ def compact_bullets(items: list[Any]) -> list[dict[str, Any]]:
                 "organization": item_data.get("company")
                 or item_data.get("institution")
                 or item_data.get("organization"),
+                "start_date": item_data.get("start_date"),
+                "end_date": item_data.get("end_date"),
+                "date": item_data.get("date"),
                 "summary": item_data.get("summary") or item_data.get("description"),
                 "technologies": item_data.get("technologies", []),
                 "links": item_data.get("links", []),
@@ -653,20 +658,43 @@ def compile_pdf_and_count_pages(tex_path: Path) -> int:
     return count_pdf_pages(pdf_path_for_tex(tex_path))
 
 
+def assert_pdf_is_exactly_one_page(pdf_path: Path) -> int:
+    page_count = count_pdf_pages(pdf_path)
+    if page_count != ONE_PAGE_LIMIT:
+        raise IntakeError(f"{pdf_path} has {page_count} pages; expected exactly 1 page.")
+    return page_count
+
+
+def halve_margin(margin: str) -> str:
+    match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)([A-Za-z]+)\s*", margin)
+    if not match:
+        raise IntakeError(f"Cannot halve unsupported LaTeX margin value: {margin}")
+    value = float(match.group(1)) / 2
+    unit = match.group(2)
+    return f"{value:g}{unit}"
+
+
+def compact_page_margin(job_config: JobConfig) -> str:
+    return halve_margin(job_config.page_margin or DEFAULT_PAGE_MARGIN)
+
+
 def build_one_page_enforcement_feedback(
     page_count: int,
     attempt: int,
+    compact_margin: str,
     validation_error: str | None = None,
 ) -> str:
     feedback = (
         f"Automatic one-page PDF enforcement attempt {attempt}.\n\n"
-        f"The compiled CV PDF currently has {page_count} pages. This workflow requires "
-        "the final CV to fit on exactly one PDF page, so revise the complete job_config "
-        "and complete selection to make the rendered CV fit on one page.\n\n"
+        f"The compiled CV PDF still has {page_count} pages after the workflow reduced "
+        f"the LaTeX page margin to {compact_margin}. This workflow requires the final "
+        "CV to fit on exactly one PDF page, so revise the complete job_config and "
+        "complete selection to make the rendered CV fit on one page.\n\n"
         "Keep output_name unchanged. Set cv_length to \"one_page\". Reduce content by "
         "removing the lowest-priority sections, items, bullets, skills, coursework, "
         "education bullets, and inline technology lists as needed. Prefer fewer stronger "
-        "items over broad coverage. Return the full revised JSON object, not a patch."
+        "items over broad coverage. Do not rely on further margin reductions. Return "
+        "the full revised JSON object, not a patch."
     )
     if validation_error:
         feedback += (
@@ -701,54 +729,75 @@ def enforce_one_page_pdf(
     tex_path: Path,
 ) -> tuple[Path, int]:
     page_count = compile_pdf_and_count_pages(tex_path)
+    if page_count == ONE_PAGE_LIMIT:
+        return tex_path, page_count
 
-    for attempt in range(1, MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS + 1):
-        if page_count <= ONE_PAGE_LIMIT:
-            return tex_path, page_count
+    compact_margin = compact_page_margin(job_config)
+    print(
+        f"Compiled PDF has {page_count} pages; retrying with compact "
+        f"{compact_margin} page margins before using an LLM revision."
+    )
+    job_config.page_margin = compact_margin
+    write_yaml(job_folder / "job_config.yaml", job_config.model_dump(mode="json"))
+    tex_path = generate_cv(job_folder, database, job_config, selection)
+    page_count = compile_pdf_and_count_pages(tex_path)
+    if page_count == ONE_PAGE_LIMIT:
+        return tex_path, page_count
 
+    validation_error: str | None = None
+    payload: dict[str, Any] | None = None
+    user_prompt = ""
+    revision_feedback = ""
+    for llm_call in range(1, MAX_AUTOMATIC_ONE_PAGE_LLM_CALLS + 1):
         print(
-            f"Compiled PDF has {page_count} pages; requesting one-page revision "
-            f"attempt {attempt}/{MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS}."
+            f"Compiled PDF still has {page_count} pages with compact margins; "
+            f"requesting one-page LLM revision {llm_call}/"
+            f"{MAX_AUTOMATIC_ONE_PAGE_LLM_CALLS}."
         )
-        validation_error: str | None = None
-        for llm_attempt in range(1, MAX_ONE_PAGE_LLM_ATTEMPTS + 1):
-            revision_feedback = build_one_page_enforcement_feedback(
-                page_count,
-                attempt,
-                validation_error,
+        revision_feedback = build_one_page_enforcement_feedback(
+            page_count,
+            llm_call,
+            compact_margin,
+            validation_error,
+        )
+        user_prompt = render_prompt_template(
+            "job_refine_user.md.j2",
+            job_description=job_description,
+            cv_requirements=cv_requirements,
+            revision_feedback=revision_feedback,
+            current_job_config=yaml_text(job_config.model_dump(mode="json")),
+            current_selection=yaml_text(selection.model_dump(mode="json")),
+            candidate_inventory=candidate_inventory,
+        )
+        append_one_page_enforcement_prompt(
+            job_folder,
+            llm_call,
+            page_count,
+            system_prompt,
+            user_prompt,
+        )
+        raw_response = call_anthropic(system_prompt, user_prompt, model)
+        try:
+            payload = parse_llm_json(raw_response)
+            job_config, selection = validate_intake_payload(payload, allow_longer_cv=False)
+            job_config.page_margin = compact_margin
+            warn_selected_projects_without_portfolio_links(database, selection)
+        except IntakeError as exc:
+            if not should_retry_llm_revision_error(exc):
+                raise
+            validation_error = str(exc)
+            if llm_call == MAX_AUTOMATIC_ONE_PAGE_LLM_CALLS:
+                raise IntakeError(
+                    "One-page PDF enforcement exhausted the compile-PDF LLM call budget "
+                    f"of {MAX_COMPILE_PDF_LLM_CALLS} total calls; last revision was invalid: "
+                    f"{validation_error}"
+                ) from exc
+            print(
+                "One-page revision failed validation; using the next and final "
+                "automatic LLM call for a corrected revision."
             )
-            user_prompt = render_prompt_template(
-                "job_refine_user.md.j2",
-                job_description=job_description,
-                cv_requirements=cv_requirements,
-                revision_feedback=revision_feedback,
-                current_job_config=yaml_text(job_config.model_dump(mode="json")),
-                current_selection=yaml_text(selection.model_dump(mode="json")),
-                candidate_inventory=candidate_inventory,
-            )
-            append_one_page_enforcement_prompt(
-                job_folder,
-                attempt,
-                page_count,
-                system_prompt,
-                user_prompt,
-            )
-            raw_response = call_anthropic(system_prompt, user_prompt, model)
-            try:
-                payload = parse_llm_json(raw_response)
-                job_config, selection = validate_intake_payload(payload, allow_longer_cv=False)
-                warn_selected_projects_without_portfolio_links(database, selection)
-                break
-            except IntakeError as exc:
-                if not should_retry_llm_revision_error(exc) or (
-                    llm_attempt == MAX_ONE_PAGE_LLM_ATTEMPTS
-                ):
-                    raise
-                validation_error = str(exc)
-                print(
-                    "One-page revision failed validation; requesting corrected "
-                    f"revision {llm_attempt + 1}/{MAX_ONE_PAGE_LLM_ATTEMPTS}."
-                )
+            continue
+
         write_revised_job_files(
             job_folder,
             revision_feedback,
@@ -760,15 +809,15 @@ def enforce_one_page_pdf(
         )
         tex_path = generate_cv(job_folder, database, job_config, selection)
         page_count = compile_pdf_and_count_pages(tex_path)
+        if page_count == ONE_PAGE_LIMIT:
+            return tex_path, page_count
 
-    if page_count > ONE_PAGE_LIMIT:
-        raise IntakeError(
-            "One-page PDF enforcement failed after "
-            f"{MAX_ONE_PAGE_ENFORCEMENT_ATTEMPTS} revision attempts: "
-            f"{pdf_path_for_tex(tex_path)} still has {page_count} pages."
-        )
-
-    return tex_path, page_count
+    raise IntakeError(
+        "One-page PDF enforcement failed after compact margin fallback and "
+        f"{MAX_COMPILE_PDF_LLM_CALLS} total LLM calls: "
+        f"{pdf_path_for_tex(tex_path)} has {page_count} pages. "
+        "Run an explicit interactive refinement if you want to spend more LLM calls."
+    )
 
 
 def unique_job_folder(jobs_root: Path, requested_job_id: str) -> Path:

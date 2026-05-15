@@ -90,6 +90,8 @@ Every reusable item has an `id`. Bullets also have IDs. Job-specific CVs refer t
 
 Job folders are ignored by Git because they can contain private job descriptions, selections, and generated CVs. Local job folders should use IDs from whichever master data file is configured for generation.
 
+Generated CVs order selected experience and selected projects by recency at render time. Current or ongoing items such as `Present`, `Current`, or `Ongoing` appear first, followed by dated items from newest to oldest. This means future additions only need accurate `start_date`/`end_date` values for experience or `date` values for projects; manual `selection.yaml` ordering does not control these two rendered sections.
+
 ## Job Folders
 
 Each job folder contains:
@@ -120,6 +122,8 @@ The default Claude model is set in `scripts/create_job_from_description.py`. Ove
 
 If the LLM returns invalid IDs or malformed JSON, the script fails before writing the generated YAML/CV unless it is inside an automatic one-page enforcement correction loop.
 
+The LLM prompt asks for selected experience and projects in recency order, and the candidate inventory includes their dates. The generator still sorts those sections again before rendering so manually edited or older selections remain consistent.
+
 Per-job CV requirements can be supplied interactively, inline with `--cv-requirements`, or from a file with `--cv-requirements-file`. These can control emphasis, omissions, ordering, tone, length, or constraints on what not to mention.
 
 ## One-Page Enforcement
@@ -127,9 +131,10 @@ Per-job CV requirements can be supplied interactively, inline with `--cv-require
 Default v1 behavior:
 
 - CV length is set to `one_page` unless requirements or refinement feedback explicitly ask for a longer CV.
-- When `--compile-pdf` is used, the script compiles the PDF and checks the page count with `pdfinfo`.
-- If the PDF is longer than one page, the script asks Claude for a shorter complete `job_config` and `selection`.
-- If Claude returns an invalid one-page revision, the validation error is fed back for a corrective retry.
+- When `--compile-pdf` is used, the script compiles the PDF and checks that the page count is exactly one page with `pdfinfo`.
+- If the PDF is longer than one page, the script first persists a compact `page_margin` in `job_config.yaml` by halving the current margin and recompiles without spending an LLM call.
+- If compact margins still do not produce a one-page PDF, the script asks Claude for a shorter complete `job_config` and `selection`.
+- A Claude-backed create/refine command with `--compile-pdf` is capped at two Claude calls total: one initial generation/refinement call and one automatic one-page correction call. Further changes should be made with explicit refinement.
 - Experience and project bullets should be short enough to fit on one CV line whenever possible.
 - Education stays compact.
 - Coursework and education bullets are hidden unless explicitly requested or unusually relevant.
