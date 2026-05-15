@@ -133,7 +133,8 @@ Default v1 behavior:
 - CV length is set to `one_page` unless requirements or refinement feedback explicitly ask for a longer CV.
 - When `--compile-pdf` is used, the script compiles the PDF and checks that the page count is exactly one page with `pdfinfo`.
 - If the PDF is longer than one page, the script first persists a compact `page_margin` in `job_config.yaml` by halving the current margin and recompiles without spending an LLM call.
-- If compact margins still do not produce a one-page PDF, the script asks Claude for a shorter complete `job_config` and `selection`.
+- If compact margins still do not produce a one-page PDF, the script removes the `additional_information` section from `job_config.yaml` and `selection.yaml`, then regenerates and recompiles without spending an LLM call.
+- If compact margins plus `additional_information` removal still do not produce a one-page PDF, the script asks Claude for a shorter complete `job_config` and `selection`. The automatic prompt tells Claude that margins have already been halved and the additional information section has already been removed, so the remaining task is to summarize and keep only the content that is absolutely necessary for the role.
 - A Claude-backed create/refine command with `--compile-pdf` is capped at two Claude calls total: one initial generation/refinement call and one automatic one-page correction call. Further changes should be made with explicit refinement.
 - Experience and project bullets should be short enough to fit on one CV line whenever possible.
 - Education stays compact.

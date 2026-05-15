@@ -57,6 +57,7 @@ LONGER_CV_PATTERNS = [
     "more than 1 page",
 ]
 PROJECT_LINK_HOSTS = ("github", "devpost", "kaggle")
+ADDITIONAL_INFORMATION_SECTION = "additional_information"
 
 
 class IntakeError(Exception):
@@ -678,23 +679,48 @@ def compact_page_margin(job_config: JobConfig) -> str:
     return halve_margin(job_config.page_margin or DEFAULT_PAGE_MARGIN)
 
 
+def remove_additional_information_section(job_config: JobConfig, selection: Selection) -> bool:
+    removed = False
+    if job_config.sections_order and ADDITIONAL_INFORMATION_SECTION in job_config.sections_order:
+        job_config.sections_order = [
+            section
+            for section in job_config.sections_order
+            if section != ADDITIONAL_INFORMATION_SECTION
+        ]
+        removed = True
+
+    if ADDITIONAL_INFORMATION_SECTION in selection.custom_sections:
+        selection.custom_sections.pop(ADDITIONAL_INFORMATION_SECTION, None)
+        removed = True
+
+    return removed
+
+
 def build_one_page_enforcement_feedback(
     page_count: int,
     attempt: int,
     compact_margin: str,
+    removed_additional_information: bool,
     validation_error: str | None = None,
 ) -> str:
+    additional_information_status = (
+        "removed the additional_information section"
+        if removed_additional_information
+        else "confirmed there was no additional_information section left to remove"
+    )
     feedback = (
         f"Automatic one-page PDF enforcement attempt {attempt}.\n\n"
         f"The compiled CV PDF still has {page_count} pages after the workflow reduced "
-        f"the LaTeX page margin to {compact_margin}. This workflow requires the final "
-        "CV to fit on exactly one PDF page, so revise the complete job_config and "
-        "complete selection to make the rendered CV fit on one page.\n\n"
+        f"the LaTeX page margin to {compact_margin} and {additional_information_status}. "
+        "This workflow requires the final CV to fit on exactly one PDF page, so revise "
+        "the complete job_config and complete selection to make the rendered CV fit on "
+        "one page.\n\n"
         "Keep output_name unchanged. Set cv_length to \"one_page\". Reduce content by "
-        "removing the lowest-priority sections, items, bullets, skills, coursework, "
+        "summarizing and selecting only the content that is absolutely necessary for "
+        "this job. Remove the lowest-priority sections, items, bullets, skills, coursework, "
         "education bullets, and inline technology lists as needed. Prefer fewer stronger "
-        "items over broad coverage. Do not rely on further margin reductions. Return "
-        "the full revised JSON object, not a patch."
+        "items over broad coverage. Do not rely on further margin reductions or the "
+        "additional_information section. Return the full revised JSON object, not a patch."
     )
     if validation_error:
         feedback += (
@@ -744,13 +770,29 @@ def enforce_one_page_pdf(
     if page_count == ONE_PAGE_LIMIT:
         return tex_path, page_count
 
+    print(
+        f"Compiled PDF still has {page_count} pages with compact margins; "
+        "removing additional_information before using an LLM revision."
+    )
+    removed_additional_information = remove_additional_information_section(job_config, selection)
+    if removed_additional_information:
+        write_yaml(job_folder / "job_config.yaml", job_config.model_dump(mode="json"))
+        write_yaml(job_folder / "selection.yaml", selection.model_dump(mode="json"))
+        tex_path = generate_cv(job_folder, database, job_config, selection)
+        page_count = compile_pdf_and_count_pages(tex_path)
+        if page_count == ONE_PAGE_LIMIT:
+            return tex_path, page_count
+    else:
+        print("No additional_information section was present to remove.")
+
     validation_error: str | None = None
     payload: dict[str, Any] | None = None
     user_prompt = ""
     revision_feedback = ""
     for llm_call in range(1, MAX_AUTOMATIC_ONE_PAGE_LLM_CALLS + 1):
         print(
-            f"Compiled PDF still has {page_count} pages with compact margins; "
+            f"Compiled PDF still has {page_count} pages after compact margins "
+            "and additional_information removal; "
             f"requesting one-page LLM revision {llm_call}/"
             f"{MAX_AUTOMATIC_ONE_PAGE_LLM_CALLS}."
         )
@@ -758,6 +800,7 @@ def enforce_one_page_pdf(
             page_count,
             llm_call,
             compact_margin,
+            removed_additional_information,
             validation_error,
         )
         user_prompt = render_prompt_template(
@@ -781,6 +824,7 @@ def enforce_one_page_pdf(
             payload = parse_llm_json(raw_response)
             job_config, selection = validate_intake_payload(payload, allow_longer_cv=False)
             job_config.page_margin = compact_margin
+            remove_additional_information_section(job_config, selection)
             warn_selected_projects_without_portfolio_links(database, selection)
         except IntakeError as exc:
             if not should_retry_llm_revision_error(exc):
@@ -813,7 +857,8 @@ def enforce_one_page_pdf(
             return tex_path, page_count
 
     raise IntakeError(
-        "One-page PDF enforcement failed after compact margin fallback and "
+        "One-page PDF enforcement failed after compact margin fallback, "
+        "additional_information removal, and "
         f"{MAX_COMPILE_PDF_LLM_CALLS} total LLM calls: "
         f"{pdf_path_for_tex(tex_path)} has {page_count} pages. "
         "Run an explicit interactive refinement if you want to spend more LLM calls."

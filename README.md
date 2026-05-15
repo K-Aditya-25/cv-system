@@ -129,7 +129,7 @@ uv run python scripts/create_job_from_description.py \
   --compile-pdf
 ```
 
-When `--compile-pdf` is used with Claude intake/refinement, the workflow compiles the CV and checks that the PDF is exactly one page. If it is too long, the workflow first retries with compact margins, then can spend one automatic Claude revision call. That keeps the full command capped at two Claude calls total: one initial generation/refinement call and one one-page correction call.
+When `--compile-pdf` is used with Claude intake/refinement, the workflow compiles the CV and checks that the PDF is exactly one page. If it is too long, the workflow first retries with compact margins, then removes the `additional_information` section, then can spend one automatic Claude revision call. That keeps the full command capped at two Claude calls total: one initial generation/refinement call and one one-page correction call.
 
 ## More Detail
 

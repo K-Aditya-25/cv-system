@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +12,7 @@ from schemas.career_schema import CareerDatabase, JobConfig, Selection
 from scripts.create_job_from_description import (
     IntakeError,
     assert_pdf_is_exactly_one_page,
+    build_one_page_enforcement_feedback,
     enforce_one_page_pdf,
     halve_margin,
 )
@@ -100,6 +101,65 @@ class PdfPageEnforcementTests(unittest.TestCase):
             self.assertEqual(job_config.page_margin, "0.275in")
             self.assertEqual(generate_mock.call_count, 1)
             call_mock.assert_not_called()
+
+    def test_additional_information_removal_runs_before_llm(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            job_folder = Path(temp_dir)
+            tex_path = job_folder / "target_engineer.tex"
+            job_config = JobConfig.model_validate(
+                {
+                    "company": "Target",
+                    "role": "Engineer",
+                    "output_name": "target_engineer",
+                    "sections_order": ["education", "additional_information", "skills"],
+                }
+            )
+            selection = Selection.model_validate(
+                {"custom_sections": {"additional_information": ["work_authorization"]}}
+            )
+
+            with (
+                patch(
+                    "scripts.create_job_from_description.compile_pdf_and_count_pages",
+                    side_effect=[2, 2, 1],
+                ),
+                patch(
+                    "scripts.create_job_from_description.generate_cv",
+                    return_value=tex_path,
+                ) as generate_mock,
+                patch("scripts.create_job_from_description.call_anthropic") as call_mock,
+            ):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    _, page_count = enforce_one_page_pdf(
+                        job_folder=job_folder,
+                        database=minimal_database(),
+                        job_description="Job description",
+                        cv_requirements="Requirements",
+                        candidate_inventory="Inventory",
+                        system_prompt="System",
+                        model="model",
+                        job_config=job_config,
+                        selection=selection,
+                        tex_path=tex_path,
+                    )
+
+            self.assertEqual(page_count, 1)
+            self.assertEqual(job_config.sections_order, ["education", "skills"])
+            self.assertEqual(selection.custom_sections, {})
+            self.assertEqual(generate_mock.call_count, 2)
+            call_mock.assert_not_called()
+
+    def test_llm_feedback_mentions_prior_layout_and_section_fallbacks(self) -> None:
+        feedback = build_one_page_enforcement_feedback(
+            page_count=2,
+            attempt=1,
+            compact_margin="0.275in",
+            removed_additional_information=True,
+        )
+
+        self.assertIn("page margin to 0.275in", feedback)
+        self.assertIn("removed the additional_information section", feedback)
+        self.assertIn("absolutely necessary", feedback)
 
     def test_compile_pdf_workflow_allows_only_one_automatic_revision_call(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
