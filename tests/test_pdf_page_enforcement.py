@@ -13,14 +13,28 @@ from scripts.create_job_from_description import (
     IntakeError,
     assert_pdf_is_exactly_one_page,
     build_one_page_enforcement_feedback,
+    call_claude_for_valid_payload,
     enforce_one_page_pdf,
     halve_margin,
+    repair_selected_skill_categories,
 )
 
 
 def minimal_database() -> CareerDatabase:
     return CareerDatabase.model_validate(
         {"profile": {"name": "Alex Example", "email": "alex@example.com"}}
+    )
+
+
+def database_with_skills() -> CareerDatabase:
+    return CareerDatabase.model_validate(
+        {
+            "profile": {"name": "Alex Example", "email": "alex@example.com"},
+            "skills": {
+                "machine_learning": ["Interpretability", "SHAP"],
+                "ai_llm_engineering": ["Explainable AI", "LLMs"],
+            },
+        }
     )
 
 
@@ -196,6 +210,79 @@ class PdfPageEnforcementTests(unittest.TestCase):
                         )
 
             self.assertEqual(call_mock.call_count, 1)
+
+    def test_skill_category_repair_moves_existing_skill_to_canonical_category(self) -> None:
+        payload = {
+            "selection": {
+                "skills": {
+                    "machine_learning": ["Explainable AI", "Interpretability"],
+                }
+            }
+        }
+
+        repairs = repair_selected_skill_categories(payload, database_with_skills())
+
+        self.assertEqual(repairs, ["Explainable AI: machine_learning -> ai_llm_engineering"])
+        self.assertEqual(
+            payload["selection"]["skills"],
+            {
+                "ai_llm_engineering": ["Explainable AI"],
+                "machine_learning": ["Interpretability"],
+            },
+        )
+
+    def test_validation_retry_uses_allowed_skills_and_previous_payload(self) -> None:
+        invalid_payload = {
+            "job_config": {
+                "company": "Target",
+                "role": "Engineer",
+                "output_name": "target_engineer",
+            },
+            "selection": {
+                "skills": {
+                    "machine_learning": ["Responsible AI"],
+                }
+            },
+            "job_summary_text": "Target engineer role.",
+            "selection_rationale": ["Initial selection."],
+        }
+        valid_payload = {
+            "job_config": {
+                "company": "Target",
+                "role": "Engineer",
+                "output_name": "target_engineer",
+            },
+            "selection": {
+                "skills": {
+                    "machine_learning": ["Interpretability"],
+                }
+            },
+            "job_summary_text": "Target engineer role.",
+            "selection_rationale": ["Corrected skill selection."],
+        }
+
+        with patch(
+            "scripts.create_job_from_description.call_anthropic",
+            side_effect=[json.dumps(invalid_payload), json.dumps(valid_payload)],
+        ) as call_mock:
+            payload, _, selection, repairs = call_claude_for_valid_payload(
+                system_prompt="System",
+                user_prompt="Original user prompt",
+                model="model",
+                database=database_with_skills(),
+                allow_longer_cv=False,
+            )
+
+        self.assertEqual(payload, valid_payload)
+        self.assertEqual(selection.skills, {"machine_learning": ["Interpretability"]})
+        self.assertEqual(repairs, [])
+        self.assertEqual(call_mock.call_count, 2)
+        retry_prompt = call_mock.call_args_list[1].args[1]
+        self.assertIn("Validation error:", retry_prompt)
+        self.assertIn("Responsible AI", retry_prompt)
+        self.assertIn("Allowed skills by category:", retry_prompt)
+        self.assertIn("Explainable AI", retry_prompt)
+        self.assertIn("Previous JSON:", retry_prompt)
 
 
 if __name__ == "__main__":

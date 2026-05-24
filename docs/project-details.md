@@ -11,7 +11,7 @@ The system is intentionally small and file-based:
 - Pydantic validates data files.
 - Jinja2 renders LaTeX.
 - LaTeX compiles the final PDF.
-- Claude through the Anthropic API can create and refine job-specific selections.
+- Claude through the Anthropic API can run a persistent interactive CV generation and refinement session.
 
 This is not a web app. It does not use PostgreSQL or a complex database. YAML is used first because it is readable, Git-friendly, and easy to edit.
 
@@ -61,9 +61,9 @@ The repo is designed so code, schemas, templates, and fake example data can be p
 - `data/raw_inputs/*` is ignored so old CVs, LinkedIn exports, and notes are not uploaded.
 - `.env` and `.env.*` are ignored so local API keys are not uploaded.
 
-When using the LLM intake workflow, the configured provider receives the job description and a compact candidate inventory containing career IDs, skills, bullet text, tags, strengths, and project links. Use the manual workflow for roles or data you do not want to send to an external API.
+When using the Claude workflow, the Anthropic API receives the job description, user CV requirements or revision feedback, current job selection state during refinement, and a compact candidate inventory containing career IDs, skills, bullet text, tags, strengths, and project links. Use the manual workflow for roles or data you do not want to send to an external API.
 
-The API key is not included in prompts, job files, or generated CVs. The intake script reads `ANTHROPIC_API_KEY` from the process environment, `.env.local`, or `.env`.
+The API key is not included in prompts, job files, or generated CVs. The Claude workflow script reads `ANTHROPIC_API_KEY` from the process environment, `.env.local`, or `.env`.
 
 ## Master Data Files
 
@@ -112,30 +112,90 @@ Claude-generated job folders can also include:
 - generated `.tex`
 - compiled `.pdf`
 
-## Claude Intake Behavior
+## Claude Interactive Session Behavior
 
-The v1 intake command creates a new job folder from pasted job description text. It can either call Claude through the Anthropic API for job parsing and selection, or run in prompt-only mode so the exact prompt package can be inspected first.
+The primary Claude command starts a persistent terminal session:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  --interactive \
+  --provider claude \
+  --compile-pdf
+```
+
+The session first prompts for a job description, then prompts for custom CV requirements or changes. Each multiline prompt is submitted by typing `END` on its own line. `Ctrl-Q` exits the session. The terminal reader temporarily disables normal terminal flow control while reading so `Ctrl-Q` can be caught by the Python process.
+
+After the first submission, the script calls Claude, writes a job folder, generates the `.tex` file, compiles the PDF when `--compile-pdf` is set, and stays open. Every later prompt in the same session is treated as revision feedback for the same job folder and runs the refinement path in the background.
+
+An existing job folder can be resumed in the same persistent loop:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  --refine-job jobs/my_real_job_folder \
+  --interactive \
+  --provider claude \
+  --compile-pdf
+```
+
+In that mode, the first prompt is revision feedback for the existing job folder.
+
+`--provider claude` is the user-facing provider value. `--provider anthropic` is still accepted as a backwards-compatible alias. Prompt-only mode still writes the prompt package without calling Claude.
 
 In automatic Claude mode, job folders are named from the generated company and role, for example `acme_software_engineer`. If a folder already exists, the script appends a numeric suffix. Use `--job-id` only when overriding that default.
 
 The default Claude model is set in `scripts/create_job_from_description.py`. Override it without editing code by setting `CV_LLM_MODEL`.
 
-If the LLM returns invalid IDs or malformed JSON, the script fails before writing the generated YAML/CV unless it is inside an automatic one-page enforcement correction loop.
+If the LLM returns malformed JSON, the script fails before writing the generated YAML/CV. If it returns structurally valid JSON with invalid selections, the repair/retry layer below runs before the command accepts the generated YAML.
 
 The LLM prompt asks for selected experience and projects in recency order, and the candidate inventory includes their dates. The generator still sorts those sections again before rendering so manually edited or older selections remain consistent.
 
 Per-job CV requirements can be supplied interactively, inline with `--cv-requirements`, or from a file with `--cv-requirements-file`. These can control emphasis, omissions, ordering, tone, length, or constraints on what not to mention.
 
+While a Claude interactive session is running with `--compile-pdf`, the script watches the active generated `.tex` file. Manual edits to that file trigger `scripts/compile_pdf.sh` automatically. The watcher pauses while Claude generation or refinement is running, then resumes against the latest generated `.tex` path.
+
+## LLM Selection Repair And Retry
+
+Claude responses are not trusted directly. The workflow applies a two-layer validation process before writing final YAML or rendering the CV.
+
+Layer 1 is deterministic skill-category repair. The script builds a reverse index from the configured master data skills:
+
+```text
+skill name -> canonical skill category
+```
+
+For each skill returned in `selection.skills`:
+
+- If the selected skill exists in the selected category, it is kept unchanged.
+- If the selected skill exists in a different master-data category, it is moved to that category.
+- If the selected skill does not exist anywhere in master data, it is left in place so validation can fail explicitly.
+
+This handles category placement errors such as Claude returning `Explainable AI` under `machine_learning` when the master data defines it under `ai_llm_engineering`. The repair is exact-string based; it does not fuzzy-match or infer similar skills.
+
+Layer 2 is one Claude validation retry for main generation/refinement calls. After deterministic repair, the script validates the complete payload by building the render context. This catches invalid skill categories, unknown skills, missing IDs, invalid bullet selections, invalid custom section items, and similar issues before the generated YAML is accepted.
+
+If validation still fails, the script sends Claude a compact correction prompt containing:
+
+- the actual validation error raised at runtime
+- the allowed skills grouped by category from the configured master data
+- the previous JSON response from Claude
+- rules requiring exact spelling, exact capitalization, valid categories, JSON-only output, and the complete response shape
+
+The retry prompt intentionally does not resend the full job description or full candidate inventory for skill-only correction. The previous response plus the allowed skills are enough to correct unknown or misplaced skills without bloating the retry context. If the retry still fails validation, the command fails and prints the validation error.
+
+Automatic one-page enforcement also receives deterministic skill-category repair. It does not spend an additional open-ended validation retry beyond the existing one-page enforcement call budget.
+
 ## One-Page Enforcement
 
-Default v1 behavior:
+Default behavior:
 
 - CV length is set to `one_page` unless requirements or refinement feedback explicitly ask for a longer CV.
 - When `--compile-pdf` is used, the script compiles the PDF and checks that the page count is exactly one page with `pdfinfo`.
 - If the PDF is longer than one page, the script first persists a compact `page_margin` in `job_config.yaml` by halving the current margin and recompiles without spending an LLM call.
 - If compact margins still do not produce a one-page PDF, the script removes the `additional_information` section from `job_config.yaml` and `selection.yaml`, then regenerates and recompiles without spending an LLM call.
 - If compact margins plus `additional_information` removal still do not produce a one-page PDF, the script asks Claude for a shorter complete `job_config` and `selection`. The automatic prompt tells Claude that margins have already been halved and the additional information section has already been removed, so the remaining task is to summarize and keep only the content that is absolutely necessary for the role.
-- A Claude-backed create/refine command with `--compile-pdf` is capped at two Claude calls total: one initial generation/refinement call and one automatic one-page correction call. Further changes should be made with explicit refinement.
+- A Claude-backed generation/refinement with `--compile-pdf` is capped at two Claude calls total: one initial generation/refinement call and one automatic one-page correction call. Further changes should be made with explicit refinement feedback in the persistent session.
 - Experience and project bullets should be short enough to fit on one CV line whenever possible.
 - Education stays compact.
 - Coursework and education bullets are hidden unless explicitly requested or unusually relevant.
@@ -356,10 +416,13 @@ PDF parsing is not implemented in this MVP.
 
 ## Future Extensions
 
-The current MVP already has Anthropic-backed v1 job intake, basic job parsing and selection, prompt-only prompt export, refinement, and one-page PDF enforcement when compiling.
+The current MVP already has Claude-backed persistent job intake/refinement, basic job parsing and selection, prompt-only prompt export, deterministic skill-category repair, validation retry for invalid LLM selections, one-page PDF enforcement when compiling, and automatic recompilation when the active generated `.tex` file is manually edited during an interactive session.
 
 Future enhancements could include:
 
+- Supermemory-backed memory for persistent candidate context, job history, preferences, and reusable career evidence across CV generation runs.
+- A messaging-accessible CV agent over WhatsApp or iMessage. The agent should accept a job description, requested changes, and any custom prompts or constraints, then return the generated PDF directly in the message thread.
+- More memory-efficient LLM prompting so the system does not send the entire candidate context on every request. Possible approaches include retrieving only relevant career records, summarising stable profile context, caching job-independent context, and passing compact IDs plus evidence snippets instead of the full master data file.
 - additional LLM providers beyond Anthropic
 - richer layout-aware fit checks beyond PDF page count
 - multiple CV templates

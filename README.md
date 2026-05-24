@@ -22,7 +22,7 @@ The career database is the source of truth. Generated CVs should only use facts,
 - `uv`
 - A LaTeX compiler for PDFs: `latexmk`, `tectonic`, or `pdflatex`
 - Optional: `pdfinfo` for one-page PDF checks
-- Optional: `ANTHROPIC_API_KEY` for Claude-powered job intake and refinement
+- Optional: `ANTHROPIC_API_KEY` for the Claude-powered interactive CV session
 
 Install and sync the Python environment:
 
@@ -87,7 +87,7 @@ Compile a generated CV to PDF:
 bash scripts/compile_pdf.sh jobs/my_real_job_folder/generated_cv_name.tex
 ```
 
-## Claude Job Intake
+## Claude Interactive CV Session
 
 Store your Anthropic API key in an ignored local env file:
 
@@ -97,39 +97,52 @@ printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY" > .env.local
 unset ANTHROPIC_API_KEY
 ```
 
-Create a job-specific CV interactively from a pasted job description:
+Start the main Claude-powered CV workflow:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml \
 uv run python scripts/create_job_from_description.py \
   --interactive \
-  --provider anthropic \
+  --provider claude \
   --compile-pdf
 ```
 
-In interactive mode, paste the job description, type `END`, paste any CV preferences, then type `END` again.
+The session prompts for a job description first. Paste it, then type `END` on its own line. It then prompts for custom CV requirements or changes; enter those and type `END` again.
 
-Use prompt-only mode when you want to inspect the prompt without calling Claude:
+After that, the command calls Claude, writes the job folder, generates the `.tex` file, compiles the PDF, and stays open. Review the generated PDF while the process is still running. To refine it, enter feedback in the terminal and type `END`; each follow-up prompt updates the same job folder through the refinement workflow. Press `Ctrl-Q` at any prompt to exit.
+
+Claude responses are validated before rendering. If Claude puts a known skill under the wrong category, the workflow moves it to the category defined in the master data. If Claude selects a skill that is not in the master data at all, the workflow sends one correction prompt with the validation error and allowed skill list.
+
+While the session is running with `--compile-pdf`, manual edits to the generated `.tex` file automatically trigger:
 
 ```bash
-CV_MASTER_DATA=data/master.private.yaml \
-uv run python scripts/create_job_from_description.py \
-  --interactive \
-  --provider prompt-only
+bash scripts/compile_pdf.sh path/to/generated_cv.tex
 ```
 
-Refine an existing generated job folder:
+Resume a persistent Claude session from an existing job folder:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml \
 uv run python scripts/create_job_from_description.py \
   --refine-job jobs/my_real_job_folder \
   --interactive \
-  --provider anthropic \
+  --provider claude \
   --compile-pdf
 ```
 
-When `--compile-pdf` is used with Claude intake/refinement, the workflow compiles the CV and checks that the PDF is exactly one page. If it is too long, the workflow first retries with compact margins, then removes the `additional_information` section, then can spend one automatic Claude revision call. That keeps the full command capped at two Claude calls total: one initial generation/refinement call and one one-page correction call.
+In this mode, the first prompt you enter is refinement feedback for that existing job folder.
+
+Use prompt-only mode only when you want to inspect the generated prompt without calling Claude:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/create_job_from_description.py \
+  path/to/job_description.txt \
+  --cv-requirements "Custom CV requirements here" \
+  --provider prompt-only
+```
+
+When `--compile-pdf` is used with Claude generation or refinement, the workflow compiles the CV and checks that the PDF is exactly one page. If it is too long, the workflow first retries with compact margins, then removes the `additional_information` section, then can spend one automatic Claude revision call. That keeps each generation/refinement capped at two Claude calls total: one main generation/refinement call and one one-page correction call.
 
 ## More Detail
 
