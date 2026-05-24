@@ -1,0 +1,14 @@
+Project Charter
+===============
+
+Python code in this project should be modular, verifiable, readable, and understandable.
+
+Rules
+-----
+
+- Python files must not exceed 100 lines.
+- Split Python scripts by responsibility before they grow into broad orchestration files.
+- Prefer small modules with clear inputs, outputs, and verification points.
+- Keep behavior easy to inspect: focused functions, explicit dependencies, and tests for risky paths.
+- Maintain `CHANGELOG.md` with dated entries and bullet points for applied changes, new features, fixes, and notable documentation updates.
+- Update `CHANGELOG.md` when preparing changes to be pushed, not for every local commit. A committed change alone does not require a changelog update unless that commit is part of the pushed change set.
