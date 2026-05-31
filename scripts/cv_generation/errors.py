@@ -1,0 +1,2 @@
+class CvGenerationError(Exception):
+    pass
