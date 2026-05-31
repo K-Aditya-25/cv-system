@@ -62,6 +62,12 @@ Validate the example data:
 uv run python scripts/validate_data.py
 ```
 
+Check that every tracked Python file follows the 100-line limit:
+
+```bash
+uv run python scripts/check_python_line_lengths.py
+```
+
 Validate your private data:
 
 ```bash

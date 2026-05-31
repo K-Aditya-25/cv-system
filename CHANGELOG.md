@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-05-31
+
+- Split the remaining oversized Python modules and test files into focused files under the 100-line limit.
+- Added a deterministic tracked-Python-file line-count check and a GitHub Actions workflow that rejects files over 100 lines.
+
 ## 2026-05-24
 
 - Split `scripts/create_job_from_description.py` into focused modules under `scripts/job_creation`.

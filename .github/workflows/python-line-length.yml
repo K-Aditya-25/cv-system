@@ -1,0 +1,13 @@
+name: Python line length
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  check-python-line-length:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject Python files over 100 lines
+        run: python3 scripts/check_python_line_lengths.py

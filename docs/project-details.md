@@ -19,7 +19,12 @@ This is not a web app. It does not use PostgreSQL or a complex database. YAML is
 
 ```text
 cv-system/
+  .github/
+    workflows/
+      python-line-length.yml
   README.md
+  CHANGELOG.md
+  project_charter
   docs/
     project-details.md
   pyproject.toml
@@ -31,7 +36,16 @@ cv-system/
     raw_inputs/
       README.md
   schemas/
-    career_schema.py
+    career_schema.py       # compatibility exports
+    base.py
+    common.py
+    custom_sections.py
+    database.py
+    job_config.py
+    primary_items.py
+    secondary_items.py
+    selection.py
+    validators.py
   templates/
     cv_template.tex.j2
   prompts/
@@ -45,11 +59,27 @@ cv-system/
       selection.yaml
   scripts/
     validate_data.py
+    check_python_line_lengths.py
     create_job_from_description.py
-    generate_cv.py
+    generate_cv.py         # compatibility entrypoint and exports
     compile_pdf.sh
+    cv_generation/         # deterministic renderer modules
+    job_creation/          # Claude intake/refinement modules
   outputs/
 ```
+
+## Python File Size Check
+
+The project charter limits every Python file to at most 100 physical lines. Check the current
+uploaded file set locally with:
+
+```bash
+python3 scripts/check_python_line_lengths.py
+```
+
+The checker asks Git for tracked and non-ignored untracked `*.py` files, reports every oversized
+file, and exits non-zero when it finds a violation. GitHub Actions runs the same command on every
+push and pull request through `.github/workflows/python-line-length.yml`.
 
 ## Data Privacy
 
