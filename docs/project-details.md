@@ -512,3 +512,9 @@ Future enhancements could include:
 - deeper semantic matching between job descriptions and career bullets
 - Streamlit UI
 - SQLite migration if YAML becomes too limiting
+
+The planned Supermemory integration is documented in
+[`docs/telegram-workflow-plan.md`](telegram-workflow-plan.md). Supermemory should remain a derived
+retrieval layer for reviewed career evidence, stable preferences, and application history.
+`data/master.private.yaml` and per-job YAML files remain authoritative. Never persist credentials or
+every casual Telegram message automatically.

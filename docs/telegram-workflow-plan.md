@@ -77,6 +77,51 @@ Adding a skill is not always a presentation-only edit: the skill should already 
 data or be handled as an explicit data update. Hiding a profile link also needs a job-specific
 display override so it does not mutate the candidate's global profile.
 
+## Future Supermemory Integration
+
+Use Supermemory as a searchable derived index, not as the source of truth:
+
+| Component | Responsibility |
+| --- | --- |
+| `data/master.private.yaml` | Authoritative personal career database |
+| Job folder YAML files | Reproducible state for each generated CV |
+| Local SQLite | Telegram conversation state |
+| Supermemory | Searchable career evidence, preferences, and job history |
+
+The best first integration is the refinement context router:
+
+```text
+Telegram refinement feedback
+  -> lightweight planner
+  -> simple structured edit?
+       yes: update job YAML locally and regenerate PDF
+       no: does the request need additional career evidence?
+            no: send current CV state only
+            yes: search Supermemory for relevant evidence
+                 -> send the top matching snippets to Claude
+                 -> fall back to the compact candidate inventory if needed
+```
+
+Useful later applications:
+
+- Store explicit stable preferences such as common exclusions, preferred CV tone, and section
+  ordering.
+- Retrieve similar past CVs and feedback when tailoring a new CV for a related role.
+- Index old CVs, LinkedIn exports, project notes, certificates, and portfolio text from local raw
+  inputs after review.
+- Track application history: company, role, generated job folder, date, and user feedback.
+- Improve LinkedIn URL intake by retrieving similar applications and reusable evidence.
+
+Guardrails:
+
+- Do not replace `data/master.private.yaml` with Supermemory.
+- Do not store API keys, Telegram tokens, or private credentials.
+- Do not write every Telegram message into long-term memory automatically.
+- Store user-approved preferences and reviewed derived evidence only.
+- Validate retrieved IDs against the YAML database before generation.
+- Scope records with container tags and metadata such as candidate, job, evidence type, and
+  application status.
+
 ## Operational Requirements
 
 - Whitelist the Telegram user ID.
@@ -131,3 +176,14 @@ Estimated effort: 2-4 focused days.
 Add the lightweight planner, structured local-edit actions, job-specific display overrides,
 compact refinement prompts, and relevant-record retrieval. Measure prompt sizes and preserve the
 existing full-context refinement route as a fallback.
+
+### Phase 6: Supermemory Retrieval Layer
+
+Estimated effort: 2-4 focused days after the context router exists.
+
+1. Add a small Supermemory adapter behind an internal interface.
+2. Index reviewed career evidence from `data/master.private.yaml` with scoped tags and metadata.
+3. Use retrieval only for refinements that need additional career evidence.
+4. Measure prompt-token use and CV quality against the compact candidate-inventory fallback.
+5. Add approved preference memory and similar-application retrieval after evidence retrieval is
+   stable.

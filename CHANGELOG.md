@@ -9,6 +9,7 @@
 - Added `/refine` for selecting an existing generated CV and `/reset` for clearing the current chat
   session and active CV without deleting generated job folders.
 - Documented the future refinement context router for reducing unnecessary LLM prompt tokens.
+- Documented the planned Supermemory retrieval layer, guardrails, and phased rollout.
 - Added Telegram workflow regression tests and ignored local SQLite conversation state.
 
 ## 2026-05-31
