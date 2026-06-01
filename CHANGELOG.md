@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-01
+
+- Added a personal Telegram bot with long polling, private-chat whitelisting, pasted or `.txt`
+  job-description intake, background CV generation, PDF delivery, and explicit CV refinement.
+- Added startup handling that discards offline messages and clears transient work so stale messages
+  cannot spend model credits after a restart.
+- Added `/refine` for selecting an existing generated CV and `/reset` for clearing the current chat
+  session and active CV without deleting generated job folders.
+- Documented the future refinement context router for reducing unnecessary LLM prompt tokens.
+- Added Telegram workflow regression tests and ignored local SQLite conversation state.
+
 ## 2026-05-31
 
 - Split the remaining oversized Python modules and test files into focused files under the 100-line limit.

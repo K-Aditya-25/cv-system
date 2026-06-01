@@ -150,6 +150,50 @@ uv run python scripts/create_job_from_description.py \
 
 When `--compile-pdf` is used with Claude generation or refinement, the workflow compiles the CV and checks that the PDF is exactly one page. If it is too long, the workflow first retries with compact margins, then removes the `additional_information` section, then can spend one automatic Claude revision call. That keeps each generation/refinement capped at two Claude calls total: one main generation/refinement call and one one-page correction call.
 
+## Telegram Bot
+
+Phase 1 includes a personal Telegram bot that runs locally with long polling. It accepts a pasted
+job description as one or more text chunks or as a UTF-8 `.txt` document, asks for optional CV
+instructions, runs the existing Claude workflow, and replies with the compiled PDF. Later ordinary
+text messages refine the active CV until `/new` starts another job. After restarting the bot
+process, offline messages are discarded intentionally. Use `/new` for a new job or `/refine` to
+choose an existing generated CV before sending feedback.
+
+Create a bot with Telegram's `@BotFather`, then store its token and your allowed private-chat ID in
+the ignored `.env.local` file:
+
+```text
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_ALLOWED_CHAT_IDS=123456789
+```
+
+Use `/whoami` in a private chat to discover its numeric chat ID. `CV_MASTER_DATA` must be set
+explicitly when the bot starts so it cannot accidentally generate a CV from example data:
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/run_telegram_bot.py
+```
+
+The bot supports:
+
+| Command | Behavior |
+| --- | --- |
+| `/start`, `/help` | Show the workflow and command reference. |
+| `/whoami` | Show the current private-chat ID. |
+| `/new` | Start collecting a new job description. |
+| `/refine` | List generated CVs and choose one to refine. |
+| `/done` | Submit accumulated description chunks or optional instructions. |
+| `/none` | Generate without additional CV instructions. |
+| `/cancel` | Discard the current draft or retained recovery action. |
+| `/reset` | Clear the session and active CV without deleting generated files. |
+| `/status` | Show the current conversation state. |
+| `/resend` | Send the latest completed PDF again. |
+
+Send a `.txt` file after `/new` as an alternative to pasting chunks. Telegram state is kept locally
+in ignored SQLite file `data/telegram_bot.sqlite3`. The bot is for personal use: CV operations only
+run in explicitly allowed private chats.
+
 ## More Detail
 
 Backend details, file formats, data modeling guidance, prompt behavior, troubleshooting, and future extension notes live in [docs/project-details.md](docs/project-details.md).

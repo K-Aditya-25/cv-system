@@ -12,8 +12,9 @@ The system is intentionally small and file-based:
 - Jinja2 renders LaTeX.
 - LaTeX compiles the final PDF.
 - Claude through the Anthropic API can run a persistent interactive CV generation and refinement session.
+- A personal Telegram bot can run that workflow through long polling and reply with generated PDFs.
 
-This is not a web app. It does not use PostgreSQL or a complex database. YAML is used first because it is readable, Git-friendly, and easy to edit.
+This is not a web app. It does not use PostgreSQL or a complex database. YAML is used first because it is readable, Git-friendly, and easy to edit. The Telegram adapter uses a local SQLite file only for conversation state.
 
 ## Folder Structure
 
@@ -27,12 +28,14 @@ cv-system/
   project_charter
   docs/
     project-details.md
+    telegram-workflow-plan.md
   pyproject.toml
   uv.lock
   .python-version
   data/
     master.example.yaml
     master.private.yaml   # local only, ignored by Git
+    telegram_bot.sqlite3  # local Telegram state, ignored by Git
     raw_inputs/
       README.md
   schemas/
@@ -62,9 +65,11 @@ cv-system/
     check_python_line_lengths.py
     create_job_from_description.py
     generate_cv.py         # compatibility entrypoint and exports
+    run_telegram_bot.py     # personal Telegram long-polling entrypoint
     compile_pdf.sh
     cv_generation/         # deterministic renderer modules
     job_creation/          # Claude intake/refinement modules
+    telegram_bot/          # Telegram API, state, routing, and workflow adapter
   outputs/
 ```
 
@@ -90,6 +95,7 @@ The repo is designed so code, schemas, templates, and fake example data can be p
 - `data/master.yaml` is also ignored for compatibility.
 - `data/raw_inputs/*` is ignored so old CVs, LinkedIn exports, and notes are not uploaded.
 - `.env` and `.env.*` are ignored so local API keys are not uploaded.
+- `data/telegram_bot.sqlite3` is ignored because it contains local Telegram conversation state.
 
 When using the Claude workflow, the Anthropic API receives the job description, user CV requirements or revision feedback, current job selection state during refinement, and a compact candidate inventory containing career IDs, skills, bullet text, tags, strengths, and project links. Use the manual workflow for roles or data you do not want to send to an external API.
 
@@ -184,6 +190,50 @@ The LLM prompt asks for selected experience and projects in recency order, and t
 Per-job CV requirements can be supplied interactively, inline with `--cv-requirements`, or from a file with `--cv-requirements-file`. These can control emphasis, omissions, ordering, tone, length, or constraints on what not to mention.
 
 While a Claude interactive session is running with `--compile-pdf`, the script watches the active generated `.tex` file. Manual edits to that file trigger `scripts/compile_pdf.sh` automatically. The watcher pauses while Claude generation or refinement is running, then resumes against the latest generated `.tex` path.
+
+## Telegram Bot Behavior
+
+Phase 1 adds a local personal Telegram bot as another interface to the Claude workflow. It uses the
+official Telegram Bot API directly through the Python standard library. Long polling keeps setup
+small: no public web server, webhook endpoint, domain, or database server is required.
+
+Create the bot through Telegram's `@BotFather`. Store the token and allowed numeric private-chat IDs
+outside Git in `.env.local`, then start the bot with an explicit private career-data file:
+
+```text
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_ALLOWED_CHAT_IDS=123456789,987654321
+```
+
+```bash
+CV_MASTER_DATA=data/master.private.yaml \
+uv run python scripts/run_telegram_bot.py
+```
+
+The bot refuses to start unless `CV_MASTER_DATA`, `TELEGRAM_BOT_TOKEN`, and
+`TELEGRAM_ALLOWED_CHAT_IDS` are configured. `/whoami` is available in private chats to discover the
+numeric ID before adding it to the whitelist. CV operations reject unauthorized chats, groups, and
+channels.
+
+After `/new`, send the job description as one or more text chunks or upload a UTF-8 `.txt` file.
+The `.txt` file is limited to 250 KB. `/done` submits accumulated chunks; then send optional CV
+instructions and use `/done`, or send `/none` to use the default requirements. The bot compiles and
+sends the generated PDF. Later ordinary text messages refine the active job folder and produce an
+updated PDF until `/new` begins another job.
+
+On startup, the bot discards Telegram updates received while it was offline and clears transient
+draft, queue, and in-flight state. After every restart, `/new` opens a new job session and `/refine`
+lists generated CVs so the user can choose an existing job folder before sending feedback. This
+prevents stale or accidental offline messages from triggering Claude calls.
+
+Use `/reset` to return the current chat to an idle state without restarting the bot process. It
+clears drafts, queued work, recovery state, and the selected CV pointers, so `/resend` is unavailable
+until another CV is generated or selected through `/refine`. Generated job folders remain on disk.
+
+The bot stores the Telegram update offset, conversation state, current job folder, latest PDF,
+queued refinements, and recoverable interrupted work in ignored local SQLite file
+`data/telegram_bot.sqlite3`. A single background worker serializes generation and refinement so the
+polling loop stays responsive and two updates cannot mutate the same job folder concurrently.
 
 ## LLM Selection Repair And Retry
 
@@ -452,7 +502,8 @@ Future enhancements could include:
 
 - Supermemory-backed memory for persistent candidate context, job history, preferences, and reusable career evidence across CV generation runs.
 - A messaging-accessible CV agent over WhatsApp or iMessage. The agent should accept a job description, requested changes, and any custom prompts or constraints, then return the generated PDF directly in the message thread.
-- More memory-efficient LLM prompting so the system does not send the entire candidate context on every request. Possible approaches include retrieving only relevant career records, summarising stable profile context, caching job-independent context, and passing compact IDs plus evidence snippets instead of the full master data file.
+- A lightweight refinement planner that classifies Telegram feedback into deterministic local edits, compact LLM refinements, or retrieved/full-context refinements. Every route should update validated `job_config.yaml` and `selection.yaml`, regenerate `.tex`, and preserve the full-context path as a fallback.
+- More memory-efficient LLM prompting so the system does not send the compact candidate inventory on every request. Possible approaches include retrieving only relevant career records, summarising stable profile context, caching job-independent context, and passing compact IDs plus evidence snippets.
 - additional LLM providers beyond Anthropic
 - richer layout-aware fit checks beyond PDF page count
 - multiple CV templates
