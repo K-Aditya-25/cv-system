@@ -22,6 +22,7 @@ jobs/*
 # Private source material used to build data/master.yaml
 data/master.yaml
 data/master.private.yaml
+data/telegram_bot.sqlite3*
 data/raw_inputs/*
 !data/raw_inputs/README.md
 
