@@ -4,12 +4,18 @@ This document is the development reference for the Telegram CV agent workflow.
 
 ## Suggested Architecture
 
-Use a Telegram bot running on a Mac. Phase 1 is implemented with pasted text chunks and UTF-8
-`.txt` documents as job-description inputs. LinkedIn URL retrieval remains Phase 2.
+Use a Telegram bot running on a Mac. Phase 2 accepts generic public HTTPS job URLs after `/new`,
+prioritizes LinkedIn postings, and keeps pasted text chunks and UTF-8 `.txt` documents as a
+deterministic fallback.
 
 ```text
 Telegram /new
-  -> paste description chunks or upload a .txt document
+  -> send a public HTTPS job URL
+       -> extract with an HTTP request first
+       -> optionally retry with Playwright when configured
+       -> if direct extraction fails, search with Tavily, then Brave, when configured
+       -> ask for an explicit careers-page or job-post URL retry when needed
+  -> or paste description chunks or upload a UTF-8 .txt document
   -> ask for optional CV instructions
   -> run existing Claude generation workflow
   -> compile and verify one-page PDF
@@ -21,8 +27,8 @@ Further text message
   -> regenerate PDF
   -> send updated PDF
 
-Future LinkedIn URL
-  -> retrieve job description
+Future job-board adapters
+  -> add Indeed and GradIreland handling
   -> follow the same workflow
 ```
 
@@ -35,12 +41,20 @@ in use.
 ```mermaid
 flowchart TD
     A["Telegram Bot Adapter"] --> B["Conversation State Machine"]
-    B --> P["Paste Chunks or Upload .txt"]
-    B -. "Phase 2" .-> C["Job URL Resolver"]
-    C --> D["LinkedIn Public Fetch"]
-    C --> E["Company Careers Page Fetch"]
-    C --> F["Paste Description Fallback"]
-    B --> G["CV Workflow Service"]
+    B --> C["Public HTTPS Job URL Resolver"]
+    B --> P["Paste Chunks or Upload UTF-8 .txt"]
+    C --> D["LinkedIn-Prioritized HTTP Fetch"]
+    D -->|Resolved| S["Confirm Extracted Company and Role When Available"]
+    D -->|Unresolved| E["Optional Playwright Fallback When Enabled"]
+    E -->|Resolved| S
+    E -->|Still Unresolved| F["Tavily Search, Then Brave Fallback When Configured"]
+    F -->|Resolved| S
+    F -->|Still Unresolved| R["Ask for Explicit Careers-Page or Job-Post URL"]
+    R --> X["Retry Explicit URL and Careers-Page Listing Links"]
+    X -->|Resolved| S
+    X -->|Still Unresolved| P
+    S --> G["CV Workflow Service"]
+    P --> G
     G --> H["Claude Selection and Refinement"]
     H --> I["TeX Generation"]
     I --> J["PDF Compilation and One-Page Check"]
@@ -126,9 +140,16 @@ Guardrails:
 
 - Whitelist the Telegram user ID.
 - Store the bot token and Anthropic key outside Git.
+- Read optional `TAVILY_API_KEY` and `BRAVE_SEARCH_API_KEY` values from ignored local environment
+  configuration. Do not persist search keys in Telegram state, job folders, prompts, or generated files. Direct LinkedIn
+  and other public job URLs must remain usable without either search key.
+- Enable optional Playwright rendering only when `TELEGRAM_RESOLVER_PLAYWRIGHT=1` is configured and
+  Playwright with Chromium is installed. Keep HTTP extraction and text fallbacks available without it.
 - Keep `data/master.private.yaml` local.
 - Process generation in a background worker so the bot remains responsive.
-- Send status updates such as `Retrieving posting`, `Generating CV`, and `Compiling PDF`.
+- Send plain-language status updates while resolving a URL, retrieving a posting, generating a CV,
+  and compiling a PDF. Confirm the extracted company and role when available.
+- Apply URL safety checks before retrieval: accept public HTTPS URLs only and reject unsafe targets.
 - Serialize refinements per chat to avoid two messages updating the same job folder concurrently.
 - Retain the existing job folders as an audit trail.
 - Record failures and send actionable fallback prompts.
@@ -148,12 +169,17 @@ Estimated effort: 1-2 focused days.
 This proves messaging, SQLite state management, generation, refinement, and PDF delivery with
 minimal risk. Job descriptions can be sent as pasted text chunks or UTF-8 `.txt` files.
 
-### Phase 2: LinkedIn URL Resolver
+### Phase 2: Public HTTPS Job URL Resolver
 
-Estimated effort: 1-3 additional days for a best-effort personal version.
+Status: implemented.
 
-Add public-page retrieval, content validation, company careers-page handling, and pasted-text
-fallback. The fallback is important because LinkedIn retrieval will occasionally fail.
+After `/new`, accept generic public HTTPS URLs with LinkedIn-prioritized handling. Resolve postings
+with HTTP-first extraction and an optional Playwright fallback. Direct LinkedIn and other public
+job URLs can succeed without search keys. Only when direct extraction fails, try Tavily search when
+configured and then Brave search as the configured fallback. Keep API keys in ignored local
+environment configuration. Confirm the extracted company and role when available. When a posting still
+cannot be resolved, explicitly ask for a careers-page or direct job-post URL retry, then retain
+pasted chunks or a UTF-8 `.txt` upload as the deterministic fallback.
 
 ### Phase 3: Always-On Deployment
 
@@ -168,6 +194,8 @@ Either:
 ### Phase 4: WhatsApp Adapter
 
 Estimated effort: 2-5 additional days, plus Meta setup time.
+
+Indeed and GradIreland URL adapters remain future extensions of the Phase 2 resolver.
 
 ### Phase 5: Refinement Context Router
 

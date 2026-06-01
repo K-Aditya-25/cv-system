@@ -4,6 +4,16 @@
 
 - Added a personal Telegram bot with long polling, private-chat whitelisting, pasted or `.txt`
   job-description intake, background CV generation, PDF delivery, and explicit CV refinement.
+- Added Phase 2 Telegram intake for generic public HTTPS job URLs with LinkedIn-prioritized
+  handling, HTTP-first extraction, optional Playwright fallback, and URL safety checks.
+- Added Tavily-first and Brave-fallback posting search through optional `TAVILY_API_KEY` and
+  `BRAVE_SEARCH_API_KEY` environment values without persisting search keys. Direct extraction
+  remains available without either search key, and search runs only after direct extraction fails.
+- Added explicit careers-page or direct job-post URL retry guidance, plain-language progress
+  updates, and deterministic pasted-chunk or UTF-8 `.txt` fallback behavior.
+- Improved Telegram URL-intake transparency by reporting the extracted company and role when
+  available in the successful resolution reply.
+- Documented Indeed and GradIreland as future job-board adapters.
 - Added startup handling that discards offline messages and clears transient work so stale messages
   cannot spend model credits after a restart.
 - Added `/refine` for selecting an existing generated CV and `/reset` for clearing the current chat

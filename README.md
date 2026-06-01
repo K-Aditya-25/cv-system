@@ -23,6 +23,8 @@ The career database is the source of truth. Generated CVs should only use facts,
 - A LaTeX compiler for PDFs: `latexmk`, `tectonic`, or `pdflatex`
 - Optional: `pdfinfo` for one-page PDF checks
 - Optional: `ANTHROPIC_API_KEY` for the Claude-powered interactive CV session
+- Optional: `TAVILY_API_KEY` and `BRAVE_SEARCH_API_KEY` for Telegram job-URL search fallbacks
+- Optional: `TELEGRAM_RESOLVER_PLAYWRIGHT=1` to render job pages that require JavaScript
 
 Install and sync the Python environment:
 
@@ -152,12 +154,19 @@ When `--compile-pdf` is used with Claude generation or refinement, the workflow 
 
 ## Telegram Bot
 
-Phase 1 includes a personal Telegram bot that runs locally with long polling. It accepts a pasted
-job description as one or more text chunks or as a UTF-8 `.txt` document, asks for optional CV
-instructions, runs the existing Claude workflow, and replies with the compiled PDF. Later ordinary
-text messages refine the active CV until `/new` starts another job. After restarting the bot
-process, offline messages are discarded intentionally. Use `/new` for a new job or `/refine` to
-choose an existing generated CV before sending feedback.
+The personal Telegram bot runs locally with long polling. After `/new`, it accepts a generic public
+HTTPS job URL with LinkedIn-prioritized handling. It extracts with HTTP first, can use an optional
+Playwright fallback, and can search with Tavily first and Brave second only when direct extraction
+fails and their API keys are configured. Direct LinkedIn and other public job URLs can succeed
+without either search key. If URL intake cannot resolve the posting, the bot explicitly asks for a
+careers-page or direct job-post URL retry. Pasted text chunks and UTF-8 `.txt` documents remain a
+deterministic fallback. The bot reports progress in plain language and confirms the extracted
+company and role when available, then asks for optional CV instructions, runs the existing Claude
+workflow, and replies with the compiled PDF.
+
+Later ordinary text messages refine the active CV until `/new` starts another job. After restarting
+the bot process, offline messages are discarded intentionally. Use `/new` for a new job or `/refine`
+to choose an existing generated CV before sending feedback.
 
 Create a bot with Telegram's `@BotFather`, then store its token and your allowed private-chat ID in
 the ignored `.env.local` file:
@@ -165,6 +174,9 @@ the ignored `.env.local` file:
 ```text
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_ALLOWED_CHAT_IDS=123456789
+TAVILY_API_KEY=...          # optional
+BRAVE_SEARCH_API_KEY=...    # optional
+TELEGRAM_RESOLVER_PLAYWRIGHT=1  # optional; requires Playwright and Chromium
 ```
 
 Use `/whoami` in a private chat to discover its numeric chat ID. `CV_MASTER_DATA` must be set
@@ -190,9 +202,13 @@ The bot supports:
 | `/status` | Show the current conversation state. |
 | `/resend` | Send the latest completed PDF again. |
 
-Send a `.txt` file after `/new` as an alternative to pasting chunks. Telegram state is kept locally
-in ignored SQLite file `data/telegram_bot.sqlite3`. The bot is for personal use: CV operations only
-run in explicitly allowed private chats.
+URL intake accepts public HTTPS targets only and applies safety checks before retrieval. Search API
+keys are read from the environment and are not persisted in Telegram state, job folders, prompts,
+or generated files. Send pasted chunks or a UTF-8 `.txt` file after `/new` when URL resolution is
+not suitable. Telegram state is kept locally in ignored SQLite file `data/telegram_bot.sqlite3`.
+The bot is for personal use: CV operations only run in explicitly allowed private chats.
+
+Indeed and GradIreland job-board adapters are planned future extensions.
 
 ## More Detail
 

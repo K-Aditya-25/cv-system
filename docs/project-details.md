@@ -101,6 +101,10 @@ When using the Claude workflow, the Anthropic API receives the job description, 
 
 The API key is not included in prompts, job files, or generated CVs. The Claude workflow script reads `ANTHROPIC_API_KEY` from the process environment, `.env.local`, or `.env`.
 
+Telegram URL intake can read optional `TAVILY_API_KEY` and `BRAVE_SEARCH_API_KEY` values from the
+process environment, `.env.local`, or `.env` for search fallbacks. Those keys are not persisted in
+Telegram state, job folders, prompts, or generated files.
+
 ## Master Data Files
 
 The structured career database can live in:
@@ -193,9 +197,9 @@ While a Claude interactive session is running with `--compile-pdf`, the script w
 
 ## Telegram Bot Behavior
 
-Phase 1 adds a local personal Telegram bot as another interface to the Claude workflow. It uses the
-official Telegram Bot API directly through the Python standard library. Long polling keeps setup
-small: no public web server, webhook endpoint, domain, or database server is required.
+The local personal Telegram bot is another interface to the Claude workflow. It uses the official
+Telegram Bot API directly through the Python standard library. Long polling keeps setup small: no
+public web server, webhook endpoint, domain, or database server is required.
 
 Create the bot through Telegram's `@BotFather`. Store the token and allowed numeric private-chat IDs
 outside Git in `.env.local`, then start the bot with an explicit private career-data file:
@@ -203,6 +207,9 @@ outside Git in `.env.local`, then start the bot with an explicit private career-
 ```text
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_ALLOWED_CHAT_IDS=123456789,987654321
+TAVILY_API_KEY=...          # optional URL-search fallback
+BRAVE_SEARCH_API_KEY=...    # optional URL-search fallback
+TELEGRAM_RESOLVER_PLAYWRIGHT=1  # optional; requires Playwright and Chromium
 ```
 
 ```bash
@@ -215,11 +222,28 @@ The bot refuses to start unless `CV_MASTER_DATA`, `TELEGRAM_BOT_TOKEN`, and
 numeric ID before adding it to the whitelist. CV operations reject unauthorized chats, groups, and
 channels.
 
-After `/new`, send the job description as one or more text chunks or upload a UTF-8 `.txt` file.
-The `.txt` file is limited to 250 KB. `/done` submits accumulated chunks; then send optional CV
-instructions and use `/done`, or send `/none` to use the default requirements. The bot compiles and
-sends the generated PDF. Later ordinary text messages refine the active job folder and produce an
-updated PDF until `/new` begins another job.
+After `/new`, send a generic public HTTPS job URL. URL intake prioritizes LinkedIn postings while
+remaining usable for other public HTTPS job pages. It runs safety checks before retrieval, attempts
+HTTP extraction first, and can use an optional Playwright fallback when configured. If direct
+extraction fails, it uses Tavily as the primary configured search provider and Brave as the
+fallback. Direct LinkedIn and other public job URLs can resolve without either search key. The
+search keys remain process configuration only and are not written to SQLite or job artifacts.
+
+Set `TELEGRAM_RESOLVER_PLAYWRIGHT=1` to enable the optional renderer after installing Playwright
+and Chromium. Without that flag or dependency, the resolver continues through HTTP extraction and
+the normal fallback sequence.
+
+If the resolver cannot identify the posting, the bot explicitly asks for a careers-page URL or a
+direct job-post URL retry. Pasted description chunks and UTF-8 `.txt` uploads remain the
+deterministic fallback; `.txt` files are limited to 250 KB. `/done` submits accumulated chunks.
+Then send optional CV instructions and use `/done`, or send `/none` to use the default
+requirements. The bot reports progress in plain language while resolving the URL, retrieving the
+posting, generating the CV, and compiling the PDF. After successful URL extraction, its reply also
+includes the extracted company and role when available.
+
+The bot compiles and sends the generated PDF. Later ordinary text messages refine the active job
+folder and produce an updated PDF until `/new` begins another job. Indeed and GradIreland adapters
+remain future extensions of the URL resolver.
 
 On startup, the bot discards Telegram updates received while it was offline and clears transient
 draft, queue, and in-flight state. After every restart, `/new` opens a new job session and `/refine`
