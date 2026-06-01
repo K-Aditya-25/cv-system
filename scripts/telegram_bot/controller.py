@@ -3,14 +3,14 @@ from pathlib import Path
 from queue import Queue
 from scripts.job_creation.constants import DEFAULT_CV_REQUIREMENTS
 from .api import TelegramApi
-from .controller_actions import HELP, append, clear, hard_reset, resend, save, start
+from .controller_actions import HELP, append, clear, hard_reset, resend, retry_pending, save, start
 from .controller_jobs import add_text_document, begin_refine, choose_refine
+from .controller_url import route_url_text, status_text
 from .models import Session, WorkItem
 from .store import StateStore
 class BotController:
     def __init__(self, api: TelegramApi, store: StateStore, work: Queue[WorkItem], allowed: set[int]):
         self.api, self.store, self.work, self.allowed = api, store, work, allowed
-
     def handle(self, update: dict) -> None:
         message = update.get("message", {})
         chat, text = message.get("chat", {}), message.get("text", "").strip()
@@ -27,7 +27,7 @@ class BotController:
         if text.startswith("/"):
             self._command(session, text.split()[0].lower())
         elif message.get("document"):
-            self._document(session, message["document"])
+            add_text_document(self.api, self.store, session, message["document"])
         elif text:
             self._text(session, text)
     def _command(self, session: Session, command: str) -> None:
@@ -35,7 +35,7 @@ class BotController:
             self.api.send_message(session.chat_id, HELP)
         elif command == "/new" and session.state != "busy":
             clear(session, "collecting_description", active=1)
-            self._save(session, "Paste the job description in chunks or send a .txt file, then use /done.")
+            self._save(session, "Send a job URL, paste the description, or send a .txt file. Use /done after text.")
         elif command == "/refine" and session.state != "busy":
             begin_refine(self.api, self.store, session)
         elif command == "/done":
@@ -49,7 +49,7 @@ class BotController:
             hard_reset(session)
             self._save(session, "Session reset. No CV is active.")
         elif command == "/status":
-            self.api.send_message(session.chat_id, f"State: {session.state}. Active CV: {'yes' if session.latest_pdf else 'no'}.")
+            self.api.send_message(session.chat_id, status_text(session))
         elif command == "/resend":
             resend(self.api, session)
         elif session.state == "busy":
@@ -63,13 +63,12 @@ class BotController:
         elif session.state == "collecting_instructions":
             self._start_create(session, session.instructions or DEFAULT_CV_REQUIREMENTS)
         elif session.state == "recovery" and session.pending_operation:
-            session.state = "busy"
-            self.store.save(session)
-            self.work.put(WorkItem(session.chat_id, session.pending_operation, session.pending_payload))
-            self.api.send_message(session.chat_id, "Retrying retained work.")
+            retry_pending(self.api, self.store, self.work, session)
         else:
             self.api.send_message(session.chat_id, "There is nothing ready to submit.")
     def _text(self, session: Session, text: str) -> None:
+        if route_url_text(self.api, self.store, self.work, session, text):
+            return
         if session.state == "choosing_refine":
             choose_refine(self.api, self.store, session, text)
         elif not session.session_active:
@@ -77,6 +76,8 @@ class BotController:
         elif session.state == "busy":
             session.queued_feedback = append(session.queued_feedback, text)
             self._save(session, "Feedback queued for the next refinement.")
+        elif session.state == "resolving_job_url":
+            self.api.send_message(session.chat_id, "Still checking the URL. Use /cancel or /new to stop it.")
         elif session.state == "collecting_description":
             session.description = append(session.description, text)
             self._save(session, "Description chunk added.")
@@ -87,14 +88,11 @@ class BotController:
             if not session.active_job_folder and session.pdf_path:
                 session.active_job_folder = str(session.pdf_path.parent)
                 self.store.save(session)
-            self._start(session, "refine", text, "Refining CV.")
+            start(self.api, self.store, self.work, session, "refine", text, "Refining CV.")
         else:
             self.api.send_message(session.chat_id, "Use /new before sending a job description.")
-    def _document(self, session: Session, document: dict) -> None:
-        add_text_document(self.api, self.store, session, document)
     def _start_create(self, session: Session, instructions: str) -> None:
-        self._start(session, "create", json.dumps({"description": session.description, "instructions": instructions}), "Generating CV.")
-    def _start(self, session: Session, operation: str, payload: str, notice: str) -> None:
-        start(self.api, self.store, self.work, session, operation, payload, notice)
+        payload = json.dumps({"description": session.description, "instructions": instructions})
+        start(self.api, self.store, self.work, session, "create", payload, "Generating CV.")
     def _save(self, session: Session, notice: str) -> None:
         save(self.api, self.store, session, notice)

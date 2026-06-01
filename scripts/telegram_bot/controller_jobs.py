@@ -34,8 +34,9 @@ def choose_refine(api: TelegramApi, store: StateStore, session: Session, text: s
 
 
 def add_text_document(api: TelegramApi, store: StateStore, session: Session, document: dict) -> None:
-    if session.state != "collecting_description" or Path(document.get("file_name", "")).suffix.lower() != ".txt":
-        api.send_message(session.chat_id, "Send .txt files only while collecting a job description.")
+    allowed = {"collecting_description", "awaiting_careers_url"}
+    if session.state not in allowed or Path(document.get("file_name", "")).suffix.lower() != ".txt":
+        api.send_message(session.chat_id, "Send .txt files only while providing a job description.")
         return
     try:
         downloaded = api.download_text(document["file_id"])
@@ -45,5 +46,6 @@ def add_text_document(api: TelegramApi, store: StateStore, session: Session, doc
     session.description = "\n\n".join(
         part for part in (session.description.strip(), downloaded.strip()) if part
     )
+    session.state, session.job_url, session.careers_url = "collecting_description", "", ""
     store.save(session)
     api.send_message(session.chat_id, "Job-description .txt file added. Send more text or use /done.")

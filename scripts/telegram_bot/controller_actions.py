@@ -26,7 +26,8 @@ def save(api: TelegramApi, store: StateStore, session: Session, notice: str) -> 
 def clear(session: Session, state: str = "idle", active: int = 0) -> None:
     session.state, session.description, session.instructions = state, "", ""
     session.queued_feedback, session.pending_operation, session.pending_payload = "", "", ""
-    session.last_error = ""
+    session.last_error, session.job_url, session.careers_url = "", "", ""
+    session.request_id += 1
     session.session_active = active
 
 
@@ -36,10 +37,12 @@ def hard_reset(session: Session) -> None:
 
 
 def start(api: TelegramApi, store: StateStore, work: Queue[WorkItem], session: Session,
-          operation: str, payload: str, notice: str) -> None:
-    session.state, session.pending_operation, session.pending_payload = "busy", operation, payload
+          operation: str, payload: str, notice: str, state: str = "busy",
+          request_id: int | None = None) -> None:
+    session.request_id = request_id if request_id is not None else session.request_id + 1
+    session.state, session.pending_operation, session.pending_payload = state, operation, payload
     store.save(session)
-    work.put(WorkItem(session.chat_id, operation, payload))
+    work.put(WorkItem(session.chat_id, operation, payload, session.request_id))
     api.send_message(session.chat_id, notice)
 
 
@@ -48,3 +51,21 @@ def resend(api: TelegramApi, session: Session) -> None:
         api.send_document(session.chat_id, session.pdf_path)
     else:
         api.send_message(session.chat_id, "No generated PDF is available yet.")
+
+
+def start_queued_refinement(api: TelegramApi, store: StateStore, work: Queue[WorkItem],
+                            session: Session) -> None:
+    feedback = session.queued_feedback.strip()
+    if not feedback:
+        return
+    session.queued_feedback = ""
+    start(api, store, work, session, "refine", feedback, "Applying queued refinement feedback.")
+
+
+def retry_pending(api: TelegramApi, store: StateStore, work: Queue[WorkItem],
+                  session: Session) -> None:
+    session.state = "resolving_job_url" if session.pending_operation == "resolve_url" else "busy"
+    store.save(session)
+    work.put(WorkItem(session.chat_id, session.pending_operation,
+                      session.pending_payload, session.request_id))
+    api.send_message(session.chat_id, "Retrying retained work.")

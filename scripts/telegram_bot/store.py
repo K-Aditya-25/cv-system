@@ -20,11 +20,16 @@ class StateStore:
 
     def _ensure_columns(self) -> None:
         columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(sessions)")}
-        if "session_active" not in columns:
-            self.connection.execute(
-                "ALTER TABLE sessions ADD COLUMN session_active INTEGER NOT NULL DEFAULT 0"
-            )
-            self.connection.commit()
+        additions = {
+            "session_active": "INTEGER NOT NULL DEFAULT 0",
+            "job_url": "TEXT NOT NULL DEFAULT ''",
+            "careers_url": "TEXT NOT NULL DEFAULT ''",
+            "request_id": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for name, definition in additions.items():
+            if name not in columns:
+                self.connection.execute(f"ALTER TABLE sessions ADD COLUMN {name} {definition}")
+        self.connection.commit()
 
     def session(self, chat_id: int) -> Session:
         with self.lock:
@@ -75,6 +80,6 @@ class StateStore:
             self.connection.execute(
                 "UPDATE sessions SET state='idle', description='', instructions='', "
                 "queued_feedback='', pending_operation='', pending_payload='', last_error='', "
-                "session_active=0"
+                "session_active=0, job_url='', careers_url='', request_id=request_id + 1"
             )
             self.connection.commit()

@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -45,6 +46,24 @@ class StateStoreTests(unittest.TestCase):
             session = store.session(1)
         self.assertEqual((session.state, session.description, session.queued_feedback), ("idle", "", ""))
         self.assertEqual((session.pending_operation, session.session_active), ("", 0))
+
+    def test_existing_database_adds_url_resolver_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "state.sqlite3"
+            connection = sqlite3.connect(path)
+            connection.execute(
+                "CREATE TABLE sessions (chat_id INTEGER PRIMARY KEY, state TEXT DEFAULT 'idle', "
+                "description TEXT DEFAULT '', instructions TEXT DEFAULT '', "
+                "active_job_folder TEXT DEFAULT '', latest_pdf TEXT DEFAULT '', "
+                "queued_feedback TEXT DEFAULT '', pending_operation TEXT DEFAULT '', "
+                "pending_payload TEXT DEFAULT '', last_error TEXT DEFAULT '', "
+                "session_active INTEGER DEFAULT 0)"
+            )
+            connection.execute("INSERT INTO sessions(chat_id) VALUES (42)")
+            connection.commit()
+            connection.close()
+            session = StateStore(path).session(42)
+        self.assertEqual((session.job_url, session.careers_url, session.request_id), ("", "", 0))
 
 
 if __name__ == "__main__":

@@ -17,6 +17,9 @@ class Session:
     pending_payload: str = ""
     last_error: str = ""
     session_active: int = 0
+    job_url: str = ""
+    careers_url: str = ""
+    request_id: int = 0
 
     @property
     def pdf_path(self) -> Path | None:
@@ -28,3 +31,4 @@ class WorkItem:
     chat_id: int
     operation: str
     payload: str
+    request_id: int = 0
