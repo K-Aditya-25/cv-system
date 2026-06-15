@@ -12,6 +12,8 @@ deterministic fallback.
 Telegram /new
   -> send a public HTTPS job URL
        -> extract with an HTTP request first
+       -> prefer JobPosting JSON-LD, then DOM block scoring
+       -> use timed Trafilatura or Tensorix boundary fallback only for ambiguous text
        -> optionally retry with Playwright when configured
        -> if direct extraction fails, search with Tavily, then Brave, when configured
        -> ask for an explicit careers-page or job-post URL retry when needed
@@ -64,32 +66,35 @@ flowchart TD
 The transport adapter should remain separate from the CV workflow. This makes WhatsApp an
 additional adapter later rather than a rewrite.
 
-## Future Refinement Context Router
+## Refinement Context Router
 
-The current refinement workflow sends Claude the existing job description, requirements, validated
-job config, validated selection, and a compact candidate inventory. It does not send the raw private
-master YAML file, but the repeated candidate inventory still adds avoidable tokens for small edits.
+The refinement workflow now routes feedback before spending the full Claude refinement context. The
+router keeps full-context Claude refinement as the safe fallback and never replaces the YAML source
+of truth.
 
-Add a lightweight refinement planner after `/refine` selects a CV. The planner should return a
-validated structured action and one of these routes:
+The first step is a tiny deterministic fast path for exact local commands only: show/hide coursework,
+show/hide education bullets, show/hide experience technologies, show/hide project technologies, and
+remove `additional_information`. Everything else goes to a small Tensorix planner when
+`TENSORIX_API_KEY` is available from the environment, `.env.local`, or `.env`. The default planner
+model is `minimax/minimax-m2.5`, with `CV_ROUTER_MODEL` available as an override.
 
-1. **Deterministic local edit:** Apply safe job-specific changes such as hiding a profile link,
+The planner returns a validated structured action and one of these routes:
+
+1. **Deterministic local edit:** Apply safe job-specific changes such as toggling display fields,
    removing a selected item, or removing a section without calling the larger LLM.
 2. **Compact LLM refinement:** For wording or layout changes that only affect the current CV, send
-   the feedback with the current job config, selection, and generated `.tex` file. Omit the
-   candidate inventory.
-3. **Retrieved or full-context refinement:** For requests that add or replace career evidence,
-   retrieve relevant records from the private master data or send the compact candidate inventory,
-   then run the full refinement workflow.
+   the feedback with current requirements, job config, selection, and generated `.tex` file. Omit
+   the candidate inventory and job description.
+3. **Full-context refinement:** For requests that may add, replace, emphasize, or reselect career
+   evidence, run the existing full-context workflow with the compact candidate inventory.
 
 Keep `job_config.yaml` and `selection.yaml` as the durable source of truth for every route, validate
 all changes, regenerate `.tex`, and compile the PDF normally. The generated `.tex` file can help the
 planner understand presentation-level changes, but direct TeX-only edits would be overwritten by a
 later regeneration and would make future refinements harder to reproduce.
 
-Adding a skill is not always a presentation-only edit: the skill should already exist in the master
-data or be handled as an explicit data update. Hiding a profile link also needs a job-specific
-display override so it does not mutate the candidate's global profile.
+If the Tensorix planner is missing, unavailable, low-confidence, or returns invalid JSON, the router
+uses the existing full-context refinement path.
 
 ## Future Supermemory Integration
 
@@ -102,15 +107,15 @@ Use Supermemory as a searchable derived index, not as the source of truth:
 | Local SQLite | Telegram conversation state |
 | Supermemory | Searchable career evidence, preferences, and job history |
 
-The best first integration is the refinement context router:
+The future Supermemory integration should plug into the existing router's full-context route:
 
 ```text
 Telegram refinement feedback
-  -> lightweight planner
+  -> Tensorix planner
   -> simple structured edit?
-       yes: update job YAML locally and regenerate PDF
-       no: does the request need additional career evidence?
-            no: send current CV state only
+        yes: update job YAML locally and regenerate PDF
+        no: does the request need additional career evidence?
+             no: send current CV state only
             yes: search Supermemory for relevant evidence
                  -> send the top matching snippets to Claude
                  -> fall back to the compact candidate inventory if needed
@@ -174,22 +179,42 @@ minimal risk. Job descriptions can be sent as pasted text chunks or UTF-8 `.txt`
 Status: implemented.
 
 After `/new`, accept generic public HTTPS URLs with LinkedIn-prioritized handling. Resolve postings
-with HTTP-first extraction and an optional Playwright fallback. Direct LinkedIn and other public
-job URLs can succeed without search keys. Only when direct extraction fails, try Tavily search when
-configured and then Brave search as the configured fallback. Keep API keys in ignored local
-environment configuration. Confirm the extracted company and role when available. When a posting still
-cannot be resolved, explicitly ask for a careers-page or direct job-post URL retry, then retain
-pasted chunks or a UTF-8 `.txt` upload as the deterministic fallback.
+with HTTP-first extraction and an optional Playwright fallback. The extractor is generic: it tries
+structured `JobPosting` JSON-LD first, then scores visible DOM blocks to isolate the actual job
+description from page chrome, related jobs, sign-in prompts, metadata panels, and footer content.
+Only usable but ambiguous extractions run the bounded fallback path: Trafilatura if installed, then
+the Tensorix boundary planner. `JOB_EXTRACTION_FALLBACK_TIMEOUT_SECONDS` caps that boundary work and
+defaults to five seconds.
+
+Direct LinkedIn and other public job URLs can succeed without search keys. Only when direct
+extraction fails, try Tavily search when configured and then Brave search as the configured fallback.
+Keep API keys in ignored local environment configuration. Confirm the extracted company and role
+when available. When a posting still cannot be resolved, explicitly ask for a careers-page or direct
+job-post URL retry, then retain pasted chunks or a UTF-8 `.txt` upload as the deterministic
+fallback.
+
+Resolver decisions are backend-only diagnostics, not Telegram-facing messages. The macOS service
+captures `[resolver.extract]` and `[resolver.service]` logs in the repo-local log files, including
+method choice, quality score, fallback timeout, cache store, and cache hit information.
 
 ### Phase 3: Always-On Deployment
 
+Status: implemented for local macOS Login Service deployment.
+
 Estimated effort: 1-3 additional days.
 
-Either:
+The local deployment path keeps the Telegram bot running through a per-user LaunchAgent. The checked
+in service runner changes into `/Users/adityakharbanda/cv-system`, exports
+`CV_MASTER_DATA=data/master.private.yaml`, sets a `PATH` that can find `uv`, and runs the existing
+`scripts/run_telegram_bot.py` entrypoint. Telegram, Anthropic, and optional search keys stay in the
+ignored `.env.local` or `.env` files already read by the application.
 
-- keep the Telegram bot running as a macOS background service, or
-- deploy a container with Python, LaTeX tooling, `pdfinfo`, secrets, private master data, and
-  SQLite storage.
+Use `scripts/telegram_bot_service.sh install` to copy the LaunchAgent plist into
+`~/Library/LaunchAgents`, then `scripts/telegram_bot_service.sh start` to bootstrap it into
+`gui/$UID`. The plist uses `RunAtLoad=true`, `KeepAlive=true`, and repo-local stdout/stderr logs
+under `logs/`. The same control script supports `status`, `restart`, `stop`, and `uninstall`.
+
+Container or VPS deployment remains out of scope for this phase.
 
 ### Phase 4: WhatsApp Adapter
 
@@ -199,11 +224,12 @@ Indeed and GradIreland URL adapters remain future extensions of the Phase 2 reso
 
 ### Phase 5: Refinement Context Router
 
-Estimated effort: 2-4 focused days.
+Status: implemented for Tensorix-planned routing with full-context fallback.
 
-Add the lightweight planner, structured local-edit actions, job-specific display overrides,
-compact refinement prompts, and relevant-record retrieval. Measure prompt sizes and preserve the
-existing full-context refinement route as a fallback.
+The implemented router uses exact deterministic local edits for a small safe command set, then a
+Tensorix planner for route selection. Compact refinement omits the candidate inventory, and any
+missing, invalid, or low-confidence planner decision falls back to the existing full-context Claude
+refinement route. Relevant-record retrieval remains Phase 6 work.
 
 ### Phase 6: Supermemory Retrieval Layer
 

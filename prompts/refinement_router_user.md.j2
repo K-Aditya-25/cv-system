@@ -1,0 +1,37 @@
+# Refinement Feedback
+
+{{ revision_feedback }}
+
+# Current Job
+
+company: {{ company }}
+role: {{ role }}
+
+# Current Job Config
+
+{{ current_job_config }}
+
+# Current Selection Summary
+
+{{ selection_summary }}
+
+# Current Generated CV TeX
+
+```tex
+{{ current_job_tex }}
+```
+
+# Allowed Local Actions
+
+Use only these local action shapes:
+
+```json
+{"type":"set_job_config_field","field":"include_coursework","value":true}
+{"type":"set_job_config_field","field":"include_education_bullets","value":false}
+{"type":"set_job_config_field","field":"show_experience_technologies","value":true}
+{"type":"set_job_config_field","field":"show_project_technologies","value":false}
+{"type":"remove_section","section":"section_name_present_above"}
+{"type":"remove_selected_item","item_kind":"projects","item_id":"selected_id_present_above"}
+```
+
+If the requested local action is not represented exactly by the current config or selection summary, choose full_context_refinement.

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-15
+
+- Replaced job-board-specific visible-text cleanup with a generic URL extraction pipeline:
+  structured `JobPosting` JSON-LD, visible DOM block scoring, quality assessment, optional
+  Trafilatura fallback, and optional Tensorix boundary planning for ambiguous pages only.
+- Added bounded backend diagnostics and resolver cache behavior for the Telegram URL resolver.
+  Extraction method choices, quality reports, fallback attempts, timeout results, failed attempts,
+  cache stores, and cache hits now go to service logs instead of Telegram-facing messages.
+- Changed one-page enforcement to deliver the best compiled PDF after the configured automatic
+  margin, section-removal, and LLM retry budget is exhausted, then ask for explicit refinement
+  feedback instead of failing the Telegram operation.
+
+## 2026-06-09
+
+- Added Phase 3 macOS Login Service deployment for the Telegram bot with a repo-local runner,
+  checked-in LaunchAgent plist, install/start/stop/status/restart/uninstall helper, required
+  `CV_MASTER_DATA=data/master.private.yaml` process environment, and repo-local service logs.
+- Added Phase 5 refinement context routing with exact local-edit fast paths, a Tensorix planner
+  using `TENSORIX_API_KEY` and default `CV_ROUTER_MODEL=minimax/minimax-m2.5`, compact Claude
+  refinement without candidate inventory, and full-context fallback for unsafe or invalid routes.
+
 ## 2026-06-01
 
 - Added a personal Telegram bot with long polling, private-chat whitelisting, pasted or `.txt`

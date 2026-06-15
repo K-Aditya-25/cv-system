@@ -72,10 +72,25 @@ class ResolverDiscoveryTests(unittest.TestCase):
         discover = MagicMock(search=MagicMock(return_value=SimpleNamespace(candidates=(candidate,))))
         fetch = MagicMock(side_effect=[FetchError("blocked"), FetchResult(candidate.url, "<html/>")])
         extract = MagicMock(return_value=ExtractedJob("description " * 40))
-        result = ResolverService(fetch=fetch, extract=extract, discover=discover).resolve(
+        result = ResolverService(fetch=fetch, extract=extract, discover=discover, cache={}).resolve(
             ResolutionRequest(1, "https://linkedin.example/jobs/42"))
         self.assertEqual(result.status, "resolved")
         self.assertEqual(fetch.call_args_list[-1].args[0], candidate.url)
+
+    def test_service_caches_extraction_by_requested_and_final_url(self):
+        fetch = MagicMock(return_value=FetchResult("https://careers.example/jobs/42", "<html/>"))
+        extract = MagicMock(return_value=ExtractedJob("description " * 40, title="Role",
+                                                      company="Acme"))
+        cache = {}
+        first = ResolverService(fetch=fetch, extract=extract, discover=None, cache=cache).resolve(
+            ResolutionRequest(1, "https://linkedin.example/jobs/42"))
+        second = ResolverService(fetch=fetch, extract=extract, discover=None, cache=cache).resolve(
+            ResolutionRequest(2, "https://linkedin.example/jobs/42"))
+        third = ResolverService(fetch=fetch, extract=extract, discover=None, cache=cache).resolve(
+            ResolutionRequest(3, "https://careers.example/jobs/42"))
+        self.assertEqual((first.status, second.status, third.status), ("resolved",) * 3)
+        fetch.assert_called_once_with("https://linkedin.example/jobs/42")
+        extract.assert_called_once()
 
 
 if __name__ == "__main__":

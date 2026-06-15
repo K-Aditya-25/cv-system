@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.adityakharbanda.cv-system.telegram-bot</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/adityakharbanda/cv-system/scripts/run_telegram_bot_service.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/adityakharbanda/cv-system</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/adityakharbanda/cv-system/logs/telegram_bot.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/adityakharbanda/cv-system/logs/telegram_bot.stderr.log</string>
+</dict>
+</plist>

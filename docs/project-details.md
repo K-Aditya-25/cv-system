@@ -54,7 +54,14 @@ cv-system/
   prompts/
     job_intake_system.md
     job_intake_user.md.j2
+    job_refine_compact_user.md.j2
     job_refine_user.md.j2
+    refinement_router_system.md
+    refinement_router_user.md.j2
+  launchd/
+    com.adityakharbanda.cv-system.telegram-bot.plist
+  logs/
+    .gitkeep              # local service log files are ignored
   jobs/
     my_real_job_folder/
       job_config.yaml
@@ -70,6 +77,7 @@ cv-system/
     cv_generation/         # deterministic renderer modules
     job_creation/          # Claude intake/refinement modules
     telegram_bot/          # Telegram API, state, routing, and workflow adapter
+      resolver/            # URL safety, extraction, discovery, and cache
   outputs/
 ```
 
@@ -97,13 +105,28 @@ The repo is designed so code, schemas, templates, and fake example data can be p
 - `.env` and `.env.*` are ignored so local API keys are not uploaded.
 - `data/telegram_bot.sqlite3` is ignored because it contains local Telegram conversation state.
 
-When using the Claude workflow, the Anthropic API receives the job description, user CV requirements or revision feedback, current job selection state during refinement, and a compact candidate inventory containing career IDs, skills, bullet text, tags, strengths, and project links. Use the manual workflow for roles or data you do not want to send to an external API.
+When using the Claude workflow, the Anthropic API receives the job description, user CV
+requirements, selected job state, and a compact candidate inventory containing career IDs, skills,
+bullet text, tags, strengths, and project links during initial generation and full-context
+refinement. Compact refinement routes omit the candidate inventory and use the current job config,
+selection, requirements, feedback, and generated TeX. Use the manual workflow for roles or data you
+do not want to send to an external API.
 
 The API key is not included in prompts, job files, or generated CVs. The Claude workflow script reads `ANTHROPIC_API_KEY` from the process environment, `.env.local`, or `.env`.
+
+The optional Tensorix refinement router reads `TENSORIX_API_KEY` from the process environment,
+`.env.local`, or `.env`. It receives refinement feedback, current job config, a selected-ID summary,
+and current generated TeX so it can choose between local edit, compact refinement, and full-context
+refinement. It does not receive the compact candidate inventory.
 
 Telegram URL intake can read optional `TAVILY_API_KEY` and `BRAVE_SEARCH_API_KEY` values from the
 process environment, `.env.local`, or `.env` for search fallbacks. Those keys are not persisted in
 Telegram state, job folders, prompts, or generated files.
+
+The optional Tensorix job-description boundary planner receives visible text block excerpts and link
+density metadata only when deterministic extraction produced a usable but ambiguous result. It does
+not receive API keys or the private master data. The boundary planner uses the same `TENSORIX_API_KEY`
+configuration path as the refinement router.
 
 ## Master Data Files
 
@@ -229,6 +252,26 @@ extraction fails, it uses Tavily as the primary configured search provider and B
 fallback. Direct LinkedIn and other public job URLs can resolve without either search key. The
 search keys remain process configuration only and are not written to SQLite or job artifacts.
 
+The extraction path is layered:
+
+1. Parse structured `JobPosting` JSON-LD from the page when it exists.
+2. Parse visible HTML into blocks and score contiguous job-description regions.
+3. Assess quality for short, blocked, low-confidence, or contaminated extraction output.
+4. For usable but ambiguous output only, try the optional Trafilatura extractor when installed.
+5. If still ambiguous, ask the Tensorix boundary planner for a contiguous block range.
+6. Fall back to the deterministic region when it is usable and bounded fallbacks are unavailable.
+
+This keeps common pages fast and avoids hard-coding a cleanup phrase list for each job board. The
+fallback boundary timeout is controlled by `JOB_EXTRACTION_FALLBACK_TIMEOUT_SECONDS` and defaults to
+five seconds. The running process caches successful extractions by requested URL, final URL, and
+canonical URL so repeated Telegram operations do not refetch and re-extract the same posting.
+
+Backend diagnostics are intentionally not sent to Telegram users. Resolver internals print
+`[resolver.extract]` and `[resolver.service]` lines to stdout/stderr, which the macOS service stores
+in `logs/telegram_bot.stdout.log` and `logs/telegram_bot.stderr.log`. These lines record extraction
+method choices, quality reports, fallback attempts, timeout results, failed attempts, cache stores,
+and cache hits.
+
 Set `TELEGRAM_RESOLVER_PLAYWRIGHT=1` to enable the optional renderer after installing Playwright
 and Chromium. Without that flag or dependency, the resolver continues through HTTP extraction and
 the normal fallback sequence.
@@ -300,6 +343,9 @@ Default behavior:
 - If compact margins still do not produce a one-page PDF, the script removes the `additional_information` section from `job_config.yaml` and `selection.yaml`, then regenerates and recompiles without spending an LLM call.
 - If compact margins plus `additional_information` removal still do not produce a one-page PDF, the script asks Claude for a shorter complete `job_config` and `selection`. The automatic prompt tells Claude that margins have already been halved and the additional information section has already been removed, so the remaining task is to summarize and keep only the content that is absolutely necessary for the role.
 - A Claude-backed generation/refinement with `--compile-pdf` is capped at two Claude calls total: one initial generation/refinement call and one automatic one-page correction call. Further changes should be made with explicit refinement feedback in the persistent session.
+- If the PDF is still longer after the automatic budget is exhausted, the workflow logs the failure
+  reason, returns the best compiled PDF, and waits for explicit refinement feedback rather than
+  spending more LLM calls automatically.
 - Experience and project bullets should be short enough to fit on one CV line whenever possible.
 - Education stays compact.
 - Coursework and education bullets are hidden unless explicitly requested or unusually relevant.
@@ -520,14 +566,19 @@ PDF parsing is not implemented in this MVP.
 
 ## Future Extensions
 
-The current MVP already has Claude-backed persistent job intake/refinement, basic job parsing and selection, prompt-only prompt export, deterministic skill-category repair, validation retry for invalid LLM selections, one-page PDF enforcement when compiling, and automatic recompilation when the active generated `.tex` file is manually edited during an interactive session.
+The current MVP already has Claude-backed persistent job intake/refinement, basic job parsing and
+selection, prompt-only prompt export, deterministic skill-category repair, validation retry for
+invalid LLM selections, one-page PDF enforcement when compiling, Tensorix-planned refinement context
+routing, and automatic recompilation when the active generated `.tex` file is manually edited during
+an interactive session.
 
 Future enhancements could include:
 
 - Supermemory-backed memory for persistent candidate context, job history, preferences, and reusable career evidence across CV generation runs.
 - A messaging-accessible CV agent over WhatsApp or iMessage. The agent should accept a job description, requested changes, and any custom prompts or constraints, then return the generated PDF directly in the message thread.
-- A lightweight refinement planner that classifies Telegram feedback into deterministic local edits, compact LLM refinements, or retrieved/full-context refinements. Every route should update validated `job_config.yaml` and `selection.yaml`, regenerate `.tex`, and preserve the full-context path as a fallback.
-- More memory-efficient LLM prompting so the system does not send the compact candidate inventory on every request. Possible approaches include retrieving only relevant career records, summarising stable profile context, caching job-independent context, and passing compact IDs plus evidence snippets.
+- More memory-efficient full-context prompting. Possible approaches include retrieving only relevant
+  career records, summarising stable profile context, caching job-independent context, and passing
+  compact IDs plus evidence snippets.
 - additional LLM providers beyond Anthropic
 - richer layout-aware fit checks beyond PDF page count
 - multiple CV templates

@@ -150,7 +150,7 @@ uv run python scripts/create_job_from_description.py \
   --provider prompt-only
 ```
 
-When `--compile-pdf` is used with Claude generation or refinement, the workflow compiles the CV and checks that the PDF is exactly one page. If it is too long, the workflow first retries with compact margins, then removes the `additional_information` section, then can spend one automatic Claude revision call. That keeps each generation/refinement capped at two Claude calls total: one main generation/refinement call and one one-page correction call.
+When `--compile-pdf` is used with Claude generation or refinement, the workflow compiles the CV and checks that the PDF is exactly one page. If it is too long, the workflow first retries with compact margins, then removes the `additional_information` section, then can spend one automatic Claude revision call. That keeps each generation/refinement capped at two Claude calls total: one main generation/refinement call and one one-page correction call. If the PDF is still longer after that budget, the workflow delivers the best compiled PDF and expects an explicit refinement request for further cuts.
 
 ## Telegram Bot
 
@@ -164,9 +164,25 @@ deterministic fallback. The bot reports progress in plain language and confirms 
 company and role when available, then asks for optional CV instructions, runs the existing Claude
 workflow, and replies with the compiled PDF.
 
+Job-page extraction is staged and generic rather than tied to one job board. The resolver first
+uses structured `JobPosting` JSON-LD when present, then scores visible DOM blocks to isolate the
+actual description from page chrome, related jobs, sign-in prompts, and footer content. Only
+ambiguous but usable extractions try optional fallbacks: Trafilatura when installed, then the
+Tensorix boundary planner. The fallback boundary is capped by
+`JOB_EXTRACTION_FALLBACK_TIMEOUT_SECONDS`, defaulting to five seconds. Extracted postings are
+cached by requested URL, final URL, and canonical URL for the lifetime of the running bot process.
+
 Later ordinary text messages refine the active CV until `/new` starts another job. After restarting
 the bot process, offline messages are discarded intentionally. Use `/new` for a new job or `/refine`
 to choose an existing generated CV before sending feedback.
+
+Refinement feedback uses a context router before spending the full Claude refinement prompt. A tiny
+set of exact local commands such as hiding coursework can update validated YAML directly. Other
+feedback can be planned by Tensorix through `TENSORIX_API_KEY` and
+`CV_ROUTER_MODEL=minimax/minimax-m2.5`; the planner chooses compact current-CV context or the
+existing full-context Claude fallback. The router reads `TENSORIX_API_KEY` from the environment,
+`.env.local`, or `.env`. If the planner is unavailable, low-confidence, or returns invalid JSON,
+refinement falls back to the existing full-context path.
 
 Create a bot with Telegram's `@BotFather`, then store its token and your allowed private-chat ID in
 the ignored `.env.local` file:
@@ -179,12 +195,56 @@ BRAVE_SEARCH_API_KEY=...    # optional
 TELEGRAM_RESOLVER_PLAYWRIGHT=1  # optional; requires Playwright and Chromium
 ```
 
+For Tensorix-backed refinement routing, provide the planner key through the environment or the same
+ignored local env files used by the rest of the app:
+
+```text
+TENSORIX_API_KEY=...
+CV_ROUTER_MODEL=minimax/minimax-m2.5  # optional default
+```
+
+For the macOS Login Service, either keep the key in `.env.local`/`.env` or set it in launchd's user
+environment before starting or restarting the service:
+
+```bash
+launchctl setenv TENSORIX_API_KEY ...
+scripts/telegram_bot_service.sh restart
+```
+
 Use `/whoami` in a private chat to discover its numeric chat ID. `CV_MASTER_DATA` must be set
 explicitly when the bot starts so it cannot accidentally generate a CV from example data:
 
 ```bash
 CV_MASTER_DATA=data/master.private.yaml \
 uv run python scripts/run_telegram_bot.py
+```
+
+To keep the bot running as a macOS Login Service, install the repo-local LaunchAgent:
+
+```bash
+scripts/telegram_bot_service.sh install
+scripts/telegram_bot_service.sh start
+```
+
+The service runs `scripts/run_telegram_bot_service.sh` from `/Users/adityakharbanda/cv-system`,
+exports `CV_MASTER_DATA=data/master.private.yaml`, and reads secrets from the existing ignored
+`.env.local` or `.env` files. The LaunchAgent is installed to
+`~/Library/LaunchAgents/com.adityakharbanda.cv-system.telegram-bot.plist` with `RunAtLoad=true`
+and `KeepAlive=true`. Logs stay in the repo at `logs/telegram_bot.stdout.log` and
+`logs/telegram_bot.stderr.log`, which are ignored by Git.
+
+Backend-only resolver diagnostics are written to the service logs with prefixes such as
+`[resolver.extract]` and `[resolver.service]`. They show extraction method choices, quality
+decisions, fallback attempts, timeout results, and cache hits without sending those internal details
+to the Telegram chat.
+
+Manage the service with:
+
+```bash
+scripts/telegram_bot_service.sh status
+scripts/telegram_bot_service.sh restart
+scripts/telegram_bot_service.sh stop
+scripts/telegram_bot_service.sh uninstall
 ```
 
 The bot supports:

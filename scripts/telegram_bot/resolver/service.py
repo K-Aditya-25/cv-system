@@ -1,26 +1,24 @@
 from __future__ import annotations
-
 from scripts.telegram_bot.resolver_models import (
     ExtractedPosting, FetchedPage, JobMetadata, ResolutionRequest, ResolutionResult,
 )
-
 from .discovery import DiscoveryService
 from .extract import ExtractionError, extract_page, listing_urls
 from .fetch import FetchError, fetch_html
 from .ranking import rank_candidates
 from .security import validate_public_https_url
 
-
+_CACHE: dict[str, ResolutionResult] = {}
 class ResolverService:
     def __init__(self, *, fetch=fetch_html, extract=extract_page, browser=None, discover=None,
-                 validate=validate_public_https_url, progress=None) -> None:
+                 validate=validate_public_https_url, progress=None, cache=None) -> None:
         self.fetch = fetch
         self.extract = extract
         self.browser = browser
         self.discover = DiscoveryService() if discover is None else discover
         self.validate = validate
         self.progress = progress or (lambda _stage, _url: None)
-
+        self.cache = _CACHE if cache is None else cache
     def _page(self, url: str, rendered=False) -> FetchedPage:
         if not rendered:
             page = self.fetch(url)
@@ -31,22 +29,32 @@ class ResolverService:
         if page is None:
             raise FetchError("browser did not return a page")
         return FetchedPage(url, page.url, "text/html; charset=utf-8", page.html.encode())
-
     def _attempt(self, url: str, rendered: bool = False) -> ResolutionResult | None:
+        cached = self.cache.get(url)
+        if cached:
+            _log(f"cache hit for {url}")
+            return cached
         self.progress("render" if rendered else "fetch", url)
         try:
-            posting = self.extract(self._page(url, rendered))
+            page = self._page(url, rendered)
+            cached = self.cache.get(page.final_url)
+            if cached:
+                _log(f"cache hit for final URL {page.final_url}")
+                return cached
+            posting = self.extract(page)
             if not isinstance(posting, ExtractedPosting):
-                metadata = JobMetadata(posting.company, posting.title, posting.location)
-                posting = ExtractedPosting(posting.description, metadata, url)
-            return ResolutionResult("resolved", posting=posting, metadata=posting.metadata)
-        except (FetchError, ExtractionError, ValueError, OSError):
+                metadata = JobMetadata(company=posting.company, role=posting.title,
+                                       location=posting.location)
+                posting = ExtractedPosting(posting.description, metadata, page.final_url)
+            result = ResolutionResult("resolved", posting=posting, metadata=posting.metadata)
+            self._store(url, page.final_url, posting.canonical_url, result)
+            return result
+        except (FetchError, ExtractionError, ValueError, OSError) as exc:
+            _log(f"{'render' if rendered else 'fetch'} attempt failed for {url}: {exc}")
             return None
-
     def _query(self, request: ResolutionRequest) -> str:
         metadata = request.inferred or JobMetadata()
         return " ".join(filter(None, (metadata.company, metadata.role, metadata.location))) or request.url
-
     def _listing(self, url: str) -> ResolutionResult | None:
         try:
             page = self._page(url)
@@ -59,7 +67,6 @@ class ResolverService:
             if result:
                 return result
         return None
-
     def resolve(self, request: ResolutionRequest) -> ResolutionResult:
         result = self._attempt(request.url)
         if result:
@@ -83,3 +90,11 @@ class ResolverService:
                 if result:
                     return result
         return ResolutionResult("needs_explicit_link", reason="automatic resolution did not find a posting")
+    def _store(self, requested: str, final_url: str, canonical: str, result: ResolutionResult) -> None:
+        for key in {requested, final_url, canonical}:
+            if key:
+                self.cache[key] = result
+        _log(f"cached extraction for {final_url}")
+
+def _log(message: str) -> None:
+    print(f"[resolver.service] {message}", flush=True)

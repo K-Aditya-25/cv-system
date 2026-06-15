@@ -40,13 +40,13 @@ def _compile_revision(job_folder: Path, database: CareerDatabase, job_config: Jo
     return tex_path, compile_pdf_and_count_pages(tex_path)
 
 
-def _raise_enforcement_failure(tex_path: Path, page_count: int) -> None:
-    raise IntakeError(
+def _warn_enforcement_exhausted(tex_path: Path, page_count: int) -> None:
+    print(
         "One-page PDF enforcement failed after compact margin fallback, "
         "additional_information removal, and "
         f"{MAX_COMPILE_PDF_LLM_CALLS} total LLM calls: "
         f"{pdf_path_for_tex(tex_path)} has {page_count} pages. "
-        "Run an explicit interactive refinement if you want to spend more LLM calls."
+        "Delivering the best compiled PDF; send refinement feedback to cut content."
     )
 
 
@@ -86,4 +86,5 @@ def enforce_one_page_pdf(**context: Any) -> tuple[Path, int]:
         tex_path, page_count = _compile_revision(context["job_folder"], context["database"], job_config, selection, tex_path)
         if page_count == ONE_PAGE_LIMIT:
             return tex_path, page_count
-    _raise_enforcement_failure(tex_path, page_count)
+    _warn_enforcement_exhausted(tex_path, page_count)
+    return tex_path, page_count
