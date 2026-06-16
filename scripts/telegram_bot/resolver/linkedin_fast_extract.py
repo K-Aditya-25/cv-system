@@ -12,7 +12,7 @@ from .structured_job import job_from_json_ld
 from .visible_blocks import JobPageParser
 
 
-def extract_linkedin_fast(html: str) -> ExtractedJob:
+def extract_linkedin_fast(html: str, *, allow_llm: bool = True) -> ExtractedJob:
     parser = JobPageParser()
     parser.feed(html)
     structured = job_from_json_ld(parser.scripts)
@@ -26,6 +26,8 @@ def extract_linkedin_fast(html: str) -> ExtractedJob:
     report = assess_extraction(block.text, block.confidence, selected_blocks(parser.blocks, block))
     if _accepts_deterministic(block.text, report):
         return ExtractedJob(block.text, method="dom-score")
+    if not allow_llm:
+        raise ExtractionError(report.reason)
     boundary = tensorix_description_filter(parser.blocks, timeout=_timeout())
     if boundary.extraction:
         cleaned = clean_block(boundary.extraction)

@@ -184,11 +184,12 @@ structured `JobPosting` JSON-LD, then use deterministic section filtering, then 
 small-LLM job-description filter only when deterministic filtering is unreliable. LinkedIn skips
 Playwright, Trafilatura, and the boundary planner by default.
 
-If the submitted LinkedIn page fails, run one search/discovery pass with the LinkedIn job ID and try
-only the top ranked discovered candidate that contains the same job ID. If that candidate does not
-yield a fast reliable description, ask for a careers-page URL or pasted description. Non-LinkedIn
-URLs keep the generic direct-first extraction path with optional Playwright and configured
-Tavily/Brave fallback search.
+If the submitted LinkedIn page fails but exposes links or canonical URLs containing the same job ID,
+try the top ranked same-job URL before external discovery. Otherwise run one search/discovery pass
+with the LinkedIn job ID and try only the top ranked discovered candidate that contains the same job
+ID. If that candidate does not yield a fast reliable description, ask for a careers-page URL or
+pasted description. Non-LinkedIn URLs keep the generic direct-first extraction path with optional
+Playwright and configured Tavily/Brave fallback search.
 Keep API keys in ignored local environment configuration. Confirm the extracted company and role
 when available.
 

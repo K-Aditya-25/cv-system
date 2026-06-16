@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlsplit
+import html
+from urllib.parse import urljoin, urlsplit
 
 from scripts.telegram_bot.resolver_models import SearchCandidate
 
@@ -32,6 +33,14 @@ def rank_candidates(candidates, source_url: str, job_id: str) -> list[str]:
         if _url(candidate).strip() and job_id in _url(candidate)
     }
     return sorted(urls, key=lambda url: (-_score(url, source_url, job_id), url))
+
+
+def same_job_urls_from_html(page_html: str, base_url: str, job_id: str) -> list[str]:
+    unescaped = html.unescape(page_html)
+    values = set(re.findall(r"""href=["']([^"']*""" + re.escape(job_id) + r"""[^"']*)["']""", unescaped))
+    values.update(re.findall(r"""https://[^\s"'<>]+""" + re.escape(job_id) + r"""[^\s"'<>]*""", unescaped))
+    urls = [urljoin(base_url, value) for value in values]
+    return rank_candidates(urls, base_url, job_id)
 
 
 def _score(url: str, source_url: str, job_id: str) -> int:
