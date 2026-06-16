@@ -47,7 +47,9 @@ def current(session: Session, item: WorkItem) -> bool:
 
 
 def _progress(api: Any, chat_id: int, stage: str) -> None:
-    if api and stage == "discover":
+    if api and stage == "linkedin_discover":
+        api.send_message(chat_id, "Searching for the cleanest job posting source.")
+    elif api and stage == "discover":
         api.send_message(chat_id, "The job page was unavailable. Searching careers pages.")
 
 

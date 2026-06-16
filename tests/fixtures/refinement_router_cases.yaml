@@ -1,0 +1,58 @@
+- name: remove_testing_quality_skill_category
+  feedback: Remove Testing Quality from skills
+  expected_route: local_edit
+  expect_planner_call: false
+  expected_local_action:
+    type: remove_skill_category
+    field: testing_quality
+
+- name: hide_coursework
+  feedback: hide coursework
+  expected_route: local_edit
+  expect_planner_call: false
+  expected_local_action:
+    type: set_job_config_field
+    field: include_coursework
+    value: false
+
+- name: remove_additional_information
+  feedback: remove additional_information
+  expected_route: local_edit
+  expect_planner_call: false
+  expected_local_action:
+    type: remove_section
+    section: additional_information
+
+- name: remove_dublin_bus_finder
+  feedback: Remove Dublin Bus Finder
+  expected_route: local_edit
+  expect_planner_call: false
+  expected_local_action:
+    type: remove_selected_item
+    item_kind: projects
+    item_id: dublin_bus_route_finder
+
+- name: add_cv_system_project
+  feedback: Add the CV system project
+  expected_route: full_context_refinement
+  expect_planner_call: false
+
+- name: add_cv_system_and_remove_dublin_bus
+  feedback: Add the CV system project and remove Dublin Bus Finder
+  expected_route: full_context_refinement
+  expect_planner_call: false
+
+- name: concise_eaton_bullets
+  feedback: Make the Eaton bullets more concise
+  expected_route: compact_refinement
+  expect_planner_call: true
+  planner_payload:
+    route: compact_refinement
+    confidence: 0.91
+    reason: wording only
+    local_action: null
+
+- name: improve_software_engineering_focus
+  feedback: Improve software engineering focus across experience, projects, and skills
+  expected_route: full_context_refinement
+  expect_planner_call: false

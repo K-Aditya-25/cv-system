@@ -12,19 +12,26 @@ DEFAULT_TENSORIX_BASE_URL = "https://api.tensorix.ai/v1"
 DEFAULT_ROUTER_MODEL = "minimax/minimax-m2.5"
 
 
-def tensorix_chat(system_prompt: str, user_prompt: str, request_timeout: float = 30) -> str:
+def tensorix_chat(
+    system_prompt: str,
+    user_prompt: str,
+    request_timeout: float = 30,
+    *,
+    model: str | None = None,
+    max_tokens: int = 500,
+) -> str:
     api_key = get_env_secret("TENSORIX_API_KEY")
     if not api_key:
         raise IntakeError("TENSORIX_API_KEY is not set in the environment, .env.local, or .env")
     base_url = os.environ.get("CV_ROUTER_BASE_URL", DEFAULT_TENSORIX_BASE_URL).rstrip("/")
     payload = {
-        "model": os.environ.get("CV_ROUTER_MODEL", DEFAULT_ROUTER_MODEL),
+        "model": model or os.environ.get("CV_ROUTER_MODEL", DEFAULT_ROUTER_MODEL),
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
         "temperature": 0,
-        "max_tokens": 500,
+        "max_tokens": max_tokens,
     }
     request = urllib.request.Request(
         f"{base_url}/chat/completions",

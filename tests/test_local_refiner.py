@@ -29,6 +29,18 @@ class LocalRefinerTests(unittest.TestCase):
         self.assertTrue(job_config["include_coursework"])
         self.assertEqual(generate.call_count, 1)
 
+    def test_local_edit_removes_skill_category(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            context = router_context()
+            context.job_folder = Path(temp_dir)
+            action = LocalAction("remove_skill_category", field="testing_quality")
+            tex_path = Path(temp_dir) / "cv.tex"
+            args = argparse.Namespace(compile_pdf=False, model="model")
+            with patch("scripts.job_creation.local_refiner.generate_cv", return_value=tex_path):
+                refine_job_with_local_edit(args, context, "Remove Testing Quality from skills", action)
+            selection = yaml.safe_load((Path(temp_dir) / "selection.yaml").read_text())
+        self.assertNotIn("testing_quality", selection["skills"])
+
 
 if __name__ == "__main__":
     unittest.main()

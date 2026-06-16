@@ -246,31 +246,65 @@ numeric ID before adding it to the whitelist. CV operations reject unauthorized 
 channels.
 
 After `/new`, send a generic public HTTPS job URL. URL intake prioritizes LinkedIn postings while
-remaining usable for other public HTTPS job pages. It runs safety checks before retrieval, attempts
-HTTP extraction first, and can use an optional Playwright fallback when configured. If direct
-extraction fails, it uses Tavily as the primary configured search provider and Brave as the
-fallback. Direct LinkedIn and other public job URLs can resolve without either search key. The
-search keys remain process configuration only and are not written to SQLite or job artifacts.
+remaining usable for other public HTTPS job pages. LinkedIn job URLs use a latency-first path:
+plain HTTP fetch of the submitted URL, fast structured/visible extraction, then one lightweight
+discovery pass using the LinkedIn job ID only if the direct page is not reliable. Browser rendering,
+Trafilatura, and boundary-planner fallbacks are skipped for LinkedIn by default.
 
-The extraction path is layered:
+For non-LinkedIn URLs, the resolver keeps the generic direct-first behavior and can use the optional
+Playwright fallback when configured. If direct generic extraction fails, it uses Tavily as the
+primary configured search provider and Brave as the fallback. Search keys remain process
+configuration only and are not written to SQLite or job artifacts.
 
-1. Parse structured `JobPosting` JSON-LD from the page when it exists.
-2. Parse visible HTML into blocks and score contiguous job-description regions.
-3. Assess quality for short, blocked, low-confidence, or contaminated extraction output.
-4. For usable but ambiguous output only, try the optional Trafilatura extractor when installed.
-5. If still ambiguous, ask the Tensorix boundary planner for a contiguous block range.
-6. Fall back to the deterministic region when it is usable and bounded fallbacks are unavailable.
+The LinkedIn fast extraction path is:
 
-This keeps common pages fast and avoids hard-coding a cleanup phrase list for each job board. The
-fallback boundary timeout is controlled by `JOB_EXTRACTION_FALLBACK_TIMEOUT_SECONDS` and defaults to
-five seconds. The running process caches successful extractions by requested URL, final URL, and
-canonical URL so repeated Telegram operations do not refetch and re-extract the same posting.
+1. Parse structured `JobPosting` JSON-LD from the page when it exists, normalizing any embedded
+   or escaped HTML markup into plain text.
+2. Parse visible HTML into blocks and accept clean job-section text when it contains real section
+   bodies and no LinkedIn metadata contamination.
+3. If deterministic filtering is not reliable, call the Tensorix small-LLM job-description filter
+   with bounded visible text and the short LinkedIn timeout.
+4. If the direct page still fails, search once with the LinkedIn job ID and try only the top ranked
+   discovered candidate.
+5. If that candidate fails, ask for a careers-page URL or pasted description instead of running
+   slow chained fallbacks.
+
+This keeps LinkedIn processing fast and avoids spending time on noisy-page recovery when a manual
+source is more predictable. The running process caches successful extractions by requested URL,
+final URL, and canonical URL so repeated Telegram operations do not refetch and re-extract the same
+posting.
+
+The Tensorix job-description filter uses `JOBDESC_FILTER_MODEL` when set, otherwise the same
+known-working Tensorix model as the router, `minimax/minimax-m2.5`. It requests a larger completion
+budget than the router because it returns the full cleaned description, not a short routing JSON
+payload. Tune that budget with `JOBDESC_FILTER_MAX_TOKENS` and the short LinkedIn timeout with
+`JOBDESC_FILTER_TIMEOUT_SECONDS`; set `JOB_DESCRIPTION_FILTER_ENABLED=0` to disable this fallback
+during debugging. The prompt uses few-shot JSON output and explicitly
+rejects the failure mode where section headings such as `What you will accomplish`,
+`What you will bring`, and `Recruiting Process` are returned without their body content.
 
 Backend diagnostics are intentionally not sent to Telegram users. Resolver internals print
-`[resolver.extract]` and `[resolver.service]` lines to stdout/stderr, which the macOS service stores
-in `logs/telegram_bot.stdout.log` and `logs/telegram_bot.stderr.log`. These lines record extraction
-method choices, quality reports, fallback attempts, timeout results, failed attempts, cache stores,
-and cache hits.
+`[resolver.route]`, `[resolver.extract]`, and `[resolver.service]` lines to stdout/stderr, which the
+macOS service stores in `logs/telegram_bot.stdout.log` and `logs/telegram_bot.stderr.log`.
+`[resolver.route]` records the LinkedIn strategy, fetch/discovery decisions, filter method, elapsed
+time, final URL, and terminal decision.
+
+Refinement routing decisions are also backend-only diagnostics. Each refinement prints a
+`[refinement.route]` line before any YAML mutation, Claude request, TeX generation, or PDF compile.
+To inspect a route without mutating files or calling Claude, run:
+
+```bash
+uv run python scripts/debug_refinement_route.py \
+  jobs/ebay_graduate_swe_data_platforms_2 \
+  "Remove Testing Quality from skills" \
+  --master-data data/master.private.yaml
+```
+
+The output shows the route, reason, confidence, whether Claude would be required, required context
+files, and any deterministic local action. When a refinement routes poorly, add a deterministic case
+to `tests/fixtures/refinement_router_cases.yaml` and run the router eval tests. Cases that require
+planner behavior should include a mocked `planner_payload` so tests never call Tensorix or the
+network.
 
 Set `TELEGRAM_RESOLVER_PLAYWRIGHT=1` to enable the optional renderer after installing Playwright
 and Chromium. Without that flag or dependency, the resolver continues through HTTP extraction and

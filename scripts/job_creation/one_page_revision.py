@@ -14,6 +14,7 @@ def _request_one_page_revision(context: dict[str, Any]) -> tuple[dict[str, Any],
     revision_feedback = build_one_page_enforcement_feedback(
         context["page_count"], context["llm_call"], context["compact_margin"],
         context["removed_additional_information"], context["validation_error"],
+        context.get("preserve_revision_feedback"),
     )
     user_prompt = render_prompt_template(
         "job_refine_user.md.j2", job_description=context["job_description"],
@@ -29,5 +30,4 @@ def _request_one_page_revision(context: dict[str, Any]) -> tuple[dict[str, Any],
     )
     report_skill_repairs(repairs)
     return payload, job_config, selection, revision_feedback, user_prompt
-
 

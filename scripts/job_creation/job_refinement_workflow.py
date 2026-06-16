@@ -7,6 +7,7 @@ from .compact_refiner import refine_job_with_compact_prompt
 from .job_refiner import refine_job_with_feedback as refine_job_with_full_context
 from .local_refiner import refine_job_with_local_edit
 from .refine_context import load_refine_context
+from .refinement_route_diagnostics import format_route_log
 from .refinement_router import route_refinement_feedback
 from .refinement_routes import RefinementRouteKind
 
@@ -19,7 +20,7 @@ def refine_job_with_feedback(
 ) -> tuple[Path, int | None]:
     context = load_refine_context(master_data_path, job_folder)
     route = route_refinement_feedback(revision_feedback, context)
-    print(f"Refinement route: {route.kind.value} ({route.reason})")
+    print(format_route_log(route), flush=True)
     if route.kind == RefinementRouteKind.LOCAL_EDIT and route.local_action is not None:
         return refine_job_with_local_edit(args, context, revision_feedback, route.local_action)
     if route.kind == RefinementRouteKind.COMPACT_REFINEMENT:

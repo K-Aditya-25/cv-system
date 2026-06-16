@@ -31,6 +31,20 @@ class PdfPageEnforcementTests(unittest.TestCase):
         self.assertIn("removed the additional_information section", feedback)
         self.assertIn("absolutely necessary", feedback)
 
+    def test_llm_feedback_preserves_latest_human_refinement(self) -> None:
+        feedback = build_one_page_enforcement_feedback(
+            page_count=2,
+            attempt=1,
+            compact_margin="0.275in",
+            removed_additional_information=False,
+            preserve_revision_feedback=(
+                "Add the CV system project and remove the Dublin Bus Finder project."
+            ),
+        )
+        self.assertIn("Preserve the latest explicit human refinement request", feedback)
+        self.assertIn("Do not undo requested additions", feedback)
+        self.assertIn("Add the CV system project", feedback)
+
 
 if __name__ == "__main__":
     unittest.main()

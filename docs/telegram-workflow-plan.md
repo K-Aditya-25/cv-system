@@ -178,24 +178,23 @@ minimal risk. Job descriptions can be sent as pasted text chunks or UTF-8 `.txt`
 
 Status: implemented.
 
-After `/new`, accept generic public HTTPS URLs with LinkedIn-prioritized handling. Resolve postings
-with HTTP-first extraction and an optional Playwright fallback. The extractor is generic: it tries
-structured `JobPosting` JSON-LD first, then scores visible DOM blocks to isolate the actual job
-description from page chrome, related jobs, sign-in prompts, metadata panels, and footer content.
-Only usable but ambiguous extractions run the bounded fallback path: Trafilatura if installed, then
-the Tensorix boundary planner. `JOB_EXTRACTION_FALLBACK_TIMEOUT_SECONDS` caps that boundary work and
-defaults to five seconds.
+After `/new`, accept generic public HTTPS URLs with LinkedIn-prioritized handling. LinkedIn job URLs
+use a low-latency pipeline: extract the job ID, fetch the submitted URL with plain HTTP, prefer
+structured `JobPosting` JSON-LD, then use deterministic section filtering, then the Tensorix
+small-LLM job-description filter only when deterministic filtering is unreliable. LinkedIn skips
+Playwright, Trafilatura, and the boundary planner by default.
 
-Direct LinkedIn and other public job URLs can succeed without search keys. Only when direct
-extraction fails, try Tavily search when configured and then Brave search as the configured fallback.
+If the submitted LinkedIn page fails, run one search/discovery pass with the LinkedIn job ID and try
+only the top ranked discovered candidate. If that candidate does not yield a fast reliable
+description, ask for a careers-page URL or pasted description. Non-LinkedIn URLs keep the generic
+direct-first extraction path with optional Playwright and configured Tavily/Brave fallback search.
 Keep API keys in ignored local environment configuration. Confirm the extracted company and role
-when available. When a posting still cannot be resolved, explicitly ask for a careers-page or direct
-job-post URL retry, then retain pasted chunks or a UTF-8 `.txt` upload as the deterministic
-fallback.
+when available.
 
 Resolver decisions are backend-only diagnostics, not Telegram-facing messages. The macOS service
-captures `[resolver.extract]` and `[resolver.service]` logs in the repo-local log files, including
-method choice, quality score, fallback timeout, cache store, and cache hit information.
+captures `[resolver.route]`, `[resolver.extract]`, and `[resolver.service]` logs in the repo-local
+log files. LinkedIn route logs include the fast-pipeline strategy, direct/discovered fetch path,
+filter method, elapsed time, final URL, and terminal decision.
 
 ### Phase 3: Always-On Deployment
 

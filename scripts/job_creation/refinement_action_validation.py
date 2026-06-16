@@ -38,6 +38,8 @@ def local_action_valid(action: LocalAction, context: Any) -> bool:
         return isinstance(action.section, str) and action.section in _sections(context)
     if action.type == "remove_selected_item":
         return _selected_id_exists(context.selection, action.item_kind, action.item_id)
+    if action.type == "remove_skill_category":
+        return isinstance(action.field, str) and bool(action.field.strip())
     return False
 
 

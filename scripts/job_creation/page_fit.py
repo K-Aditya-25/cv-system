@@ -43,6 +43,7 @@ def build_one_page_enforcement_feedback(
     compact_margin: str,
     removed_additional_information: bool,
     validation_error: str | None = None,
+    preserve_revision_feedback: str | None = None,
 ) -> str:
     additional_information_status = (
         "removed the additional_information section"
@@ -63,6 +64,15 @@ def build_one_page_enforcement_feedback(
         "items over broad coverage. Do not rely on further margin reductions or the "
         "additional_information section. Return the full revised JSON object, not a patch."
     )
+    if preserve_revision_feedback and preserve_revision_feedback.strip():
+        feedback += (
+            "\n\nPreserve the latest explicit human refinement request while making the "
+            "CV fit on one page. Do not undo requested additions, removals, replacements, "
+            "section focus, or evidence-selection changes from this feedback unless the "
+            "request is impossible under the candidate inventory or schema. Cut lower-priority "
+            "content first.\n\nLatest human refinement feedback:\n"
+            f"{preserve_revision_feedback.strip()}"
+        )
     if validation_error:
         feedback += (
             "\n\nThe previous automatic revision was rejected by validation:\n"
@@ -80,4 +90,3 @@ def should_retry_llm_revision_error(error: IntakeError) -> bool:
         "Anthropic API response did not contain text",
     )
     return not message.startswith(non_retryable_prefixes)
-

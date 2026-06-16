@@ -6,6 +6,8 @@ from typing import Any
 from .errors import IntakeError
 from .llm import parse_llm_json
 from .prompting import render_prompt_template
+from .refinement_context_fast_paths import route_context_fast_path
+from .refinement_intent import requires_full_context
 from .refinement_action_validation import parse_action, validate_local_route
 from .refinement_fast_paths import route_fast_path
 from .refinement_routes import (
@@ -25,6 +27,11 @@ def route_refinement_feedback(feedback: str, context: Any | None = None) -> Refi
     fast = route_fast_path(feedback)
     if fast is not None:
         return validate_local_route(fast, context)
+    fast = route_context_fast_path(feedback, context) if context is not None else None
+    if fast is not None:
+        return validate_local_route(fast, context)
+    if requires_full_context(feedback):
+        return full_context_route("feedback changes substantive CV evidence")
     if not feedback.strip() or os.environ.get("CV_ROUTER_ENABLED", "1") == "0":
         return full_context_route("router disabled or empty feedback")
     if context is None:

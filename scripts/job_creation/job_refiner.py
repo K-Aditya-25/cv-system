@@ -93,6 +93,6 @@ def refine_job_with_feedback(
             job_config=job_config,
             selection=selection,
             tex_path=tex_path,
+            preserve_revision_feedback=revision_feedback,
         )
     return tex_path, pdf_page_count
-

@@ -39,6 +39,7 @@ def refine_job_with_local_edit(args: argparse.Namespace, context: Any, feedback:
         candidate_inventory=build_candidate_inventory(context.database),
         system_prompt="Deterministic local edit; no LLM request was sent.", model=args.model,
         job_config=context.job_config, selection=context.selection, tex_path=tex_path,
+        preserve_revision_feedback=feedback,
     )
 
 
@@ -52,6 +53,8 @@ def _apply_action(context: Any, action: LocalAction) -> str:
         return _remove_section(context, action.section)
     if action.type == "remove_selected_item":
         return _remove_selected_item(context.selection, action.item_kind, action.item_id)
+    if action.type == "remove_skill_category":
+        return _remove_skill_category(context.selection, action.field)
     raise IntakeError(f"Unsupported local edit action: {action.type}")
 
 
@@ -75,6 +78,13 @@ def _remove_selected_item(selection: Any, kind: str | None, item_id: str | None)
     else:
         setattr(selection, kind, [item for item in values if item != item_id])
     return f"remove selected {kind}.{item_id}"
+
+
+def _remove_skill_category(selection: Any, category: str | None) -> str:
+    if not category:
+        raise IntakeError("Local edit is missing a skills category.")
+    selection.skills.pop(category, None)
+    return f"remove skills.{category}"
 
 
 def _existing_summary(job_folder: Any) -> str:

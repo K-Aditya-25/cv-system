@@ -32,6 +32,12 @@ def route_fast_path(feedback: str) -> RefinementRoute | None:
             "exact command to remove additional_information",
             LocalAction("remove_section", section="additional_information"),
         )
+    skill_category = _skill_category_removal(text)
+    if skill_category:
+        return _local(
+            f"exact command to remove skills.{skill_category}",
+            LocalAction("remove_skill_category", field=skill_category),
+        )
     return None
 
 
@@ -43,6 +49,16 @@ def _normalize(feedback: str) -> str:
 def _exact(text: str, pattern: str) -> bool:
     polite = r"(please )?"
     return bool(re.fullmatch(polite + pattern + r"( please)?", text))
+
+
+def _skill_category_removal(text: str) -> str | None:
+    match = re.fullmatch(
+        r"(?:please )?(?:remove|hide|exclude) ([a-z0-9_ -]+) from skills(?: please)?",
+        text,
+    )
+    if not match:
+        return None
+    return re.sub(r"[^a-z0-9]+", "_", match.group(1)).strip("_")
 
 
 def _local(reason: str, action: LocalAction) -> RefinementRoute:

@@ -52,6 +52,7 @@ def refine_job_with_compact_prompt(
         candidate_inventory=build_candidate_inventory(context.database),
         system_prompt=system_prompt, model=args.model, job_config=job_config,
         selection=selection, tex_path=tex_path,
+        preserve_revision_feedback=revision_feedback,
     )
 
 

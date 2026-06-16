@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
-from html.parser import HTMLParser
 from typing import Any, Iterable
+
+from .html_text import html_to_text
 
 
 @dataclass(frozen=True)
@@ -13,15 +13,6 @@ class StructuredJob:
     title: str = ""
     company: str = ""
     location: str = ""
-
-
-class _TextParser(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
-
-    def handle_data(self, data: str) -> None:
-        self.parts.append(data)
 
 
 def job_from_json_ld(scripts: Iterable[str]) -> StructuredJob | None:
@@ -34,7 +25,7 @@ def job_from_json_ld(scripts: Iterable[str]) -> StructuredJob | None:
         location = job.get("jobLocation") or {}
         address = location.get("address", {}) if isinstance(location, dict) else {}
         return StructuredJob(
-            _html_text(str(job.get("description", ""))),
+            html_to_text(str(job.get("description", ""))),
             str(job.get("title", "")),
             str(organization.get("name", "")),
             str(address.get("addressLocality", "")),
@@ -53,9 +44,3 @@ def _jobs(value: Any):
     elif isinstance(value, list):
         for child in value:
             yield from _jobs(child)
-
-
-def _html_text(value: str) -> str:
-    parser = _TextParser()
-    parser.feed(value)
-    return re.sub(r"\s+", " ", " ".join(parser.parts)).strip()

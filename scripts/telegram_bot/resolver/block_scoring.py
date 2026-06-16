@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .job_section_markers import is_job_section_anchor
+from .section_region import expand_job_section_region
 from .visible_blocks import VisibleBlock
 
 JOB_TERMS = (
@@ -31,7 +33,10 @@ def extract_best_region(blocks: list[VisibleBlock]) -> BlockExtraction:
     if not blocks:
         return BlockExtraction("", 0, 0, 0, "no visible content blocks")
     scores = [_score(block) for block in blocks]
-    positive = [i for i, score in enumerate(scores) if score >= 2]
+    positive = [
+        i for i, score in enumerate(scores)
+        if score >= 2 or is_job_section_anchor(blocks[i].text)
+    ]
     if not positive:
         index = max(range(len(blocks)), key=lambda i: scores[i])
         return _region(blocks, index, index, scores, "single best low-confidence block")
@@ -40,6 +45,7 @@ def extract_best_region(blocks: list[VisibleBlock]) -> BlockExtraction:
         start -= 1
     while end + 1 < len(blocks) and _keeps_context(blocks[end + 1], scores[end + 1]):
         end += 1
+    start, end = expand_job_section_region(blocks, start, end)
     return _region(blocks, start, end, scores, "best contiguous job-like region")
 
 

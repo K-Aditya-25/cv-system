@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
+from .job_section_markers import keeps_visible_text_block
+
 BLOCK_TAGS = {"body", "article", "main", "section", "div", "p", "li", "ul", "ol", "h1", "h2", "h3"}
 HIDDEN_TAGS = {"script", "style", "noscript", "template", "svg"}
 
@@ -33,6 +35,8 @@ class JobPageParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs) -> None:
         values = dict(attrs)
+        if tag == "br" and not self.hidden and self._stack:
+            self._stack[-1][1].append("\n")
         if tag in HIDDEN_TAGS:
             self.hidden += 1
         if tag == "script" and values.get("type", "").lower() == "application/ld+json":
@@ -54,6 +58,10 @@ class JobPageParser(HTMLParser):
         if tag in HIDDEN_TAGS and self.hidden:
             self.hidden -= 1
 
+    def handle_startendtag(self, tag, attrs) -> None:
+        if tag == "br" and not self.hidden and self._stack:
+            self._stack[-1][1].append("\n")
+
     def handle_data(self, data) -> None:
         if self.json_ld:
             self.scripts.append(data)
@@ -73,7 +81,7 @@ class JobPageParser(HTMLParser):
             segments = [raw]
         for segment in segments:
             text = re.sub(r"\s+", " ", segment).strip()
-            if len(text.split()) >= 4:
+            if keeps_visible_text_block(text):
                 self._append_blocks(tag, text, link_chars)
 
     def _append_blocks(self, tag: str, text: str, link_chars: int) -> None:
