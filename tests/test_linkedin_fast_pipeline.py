@@ -62,6 +62,19 @@ class LinkedinFastPipelineTests(unittest.TestCase):
                 ResolutionRequest(1, "https://www.linkedin.com/jobs/view/1234567890/"))
         self.assertEqual(result.status, "needs_explicit_link")
 
+    def test_linkedin_ignores_discovery_candidates_without_same_job_id(self):
+        discover = MagicMock(search=MagicMock(return_value=SimpleNamespace(candidates=(
+            SearchCandidate("https://careers.linkedin.com"),
+            SearchCandidate("https://www.linkedin.com/jobs/search"),
+        ))))
+        fetch = MagicMock(return_value=FetchResult("https://x", "<html><body>blocked</body></html>"))
+        with patch("scripts.telegram_bot.resolver.linkedin_fast_extract.tensorix_description_filter",
+                   return_value=PlannedBoundary(None, "timeout")):
+            result = ResolverService(fetch=fetch, discover=discover, cache={}).resolve(
+                ResolutionRequest(1, "https://www.linkedin.com/jobs/view/1234567890/"))
+        self.assertEqual(result.status, "needs_explicit_link")
+        fetch.assert_called_once()
+
     def test_route_logs_include_strategy_and_method(self):
         fetch = MagicMock(return_value=FetchResult("https://linkedin.com/jobs/view/1234567890", jsonld()))
         output = io.StringIO()

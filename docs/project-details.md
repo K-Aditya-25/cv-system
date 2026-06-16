@@ -265,7 +265,7 @@ The LinkedIn fast extraction path is:
 3. If deterministic filtering is not reliable, call the Tensorix small-LLM job-description filter
    with bounded visible text and the short LinkedIn timeout.
 4. If the direct page still fails, search once with the LinkedIn job ID and try only the top ranked
-   discovered candidate.
+   discovered candidate that contains the same job ID.
 5. If that candidate fails, ask for a careers-page URL or pasted description instead of running
    slow chained fallbacks.
 

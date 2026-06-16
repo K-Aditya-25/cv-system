@@ -26,7 +26,11 @@ def discovery_query(url: str, job_id: str) -> str:
 
 
 def rank_candidates(candidates, source_url: str, job_id: str) -> list[str]:
-    urls = {_url(candidate).strip() for candidate in candidates if _url(candidate).strip()}
+    urls = {
+        _url(candidate).strip()
+        for candidate in candidates
+        if _url(candidate).strip() and job_id in _url(candidate)
+    }
     return sorted(urls, key=lambda url: (-_score(url, source_url, job_id), url))
 
 

@@ -58,7 +58,7 @@ def _discover(service, query: str, source_url: str, job_id: str) -> list[str]:
     candidates = outcome.candidates if hasattr(outcome, "candidates") else outcome
     ranked = rank_candidates(candidates, source_url, job_id)
     top = ranked[0] if ranked else ""
-    _log(f"step=discovery candidates={len(ranked)} top_url={top}")
+    _log(f"step=discovery raw_candidates={len(candidates)} same_job_candidates={len(ranked)} top_url={top}")
     return ranked[:1]
 
 
