@@ -33,6 +33,6 @@ def _tensorix_timeout() -> float:
 
 def _tensorix_max_tokens() -> int:
     try:
-        return max(1000, int(os.environ.get("CV_TENSORIX_MAX_TOKENS", "6000")))
+        return max(1000, int(os.environ.get("CV_TENSORIX_MAX_TOKENS", "12000")))
     except ValueError:
-        return 6000
+        return 12000

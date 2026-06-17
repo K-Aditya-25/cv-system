@@ -5,6 +5,7 @@ import os
 import urllib.error
 import urllib.request
 
+from .chat_response import chat_message_text
 from .env import get_env_secret
 from .errors import IntakeError
 
@@ -53,15 +54,4 @@ def tensorix_chat(
         raise IntakeError(f"{purpose} request failed: HTTP {exc.code}: {details}") from exc
     except urllib.error.URLError as exc:
         raise IntakeError(f"{purpose} request failed: {exc.reason}") from exc
-    return _message_content(response_payload, purpose)
-
-
-def _message_content(payload: dict, purpose: str = "Tensorix router") -> str:
-    choices = payload.get("choices") or []
-    if not choices:
-        raise IntakeError(f"{purpose} response did not contain choices")
-    message = choices[0].get("message") or {}
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise IntakeError(f"{purpose} response did not contain message text")
-    return content.strip()
+    return chat_message_text(response_payload, purpose)
