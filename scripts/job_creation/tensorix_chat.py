@@ -25,6 +25,7 @@ def tensorix_chat(
     max_tokens: int = 500,
     purpose: str = "Tensorix router",
     attempts: int = 1,
+    response_format: dict[str, str] | None = None,
 ) -> str:
     api_key = get_env_secret("TENSORIX_API_KEY")
     if not api_key:
@@ -44,6 +45,8 @@ def tensorix_chat(
         "temperature": 0,
         "max_tokens": max_tokens,
     }
+    if response_format is not None:
+        payload["response_format"] = response_format
     data = json.dumps(payload).encode("utf-8")
     url = f"{base_url}/chat/completions"
     headers = {"content-type": "application/json", "authorization": f"Bearer {api_key}"}

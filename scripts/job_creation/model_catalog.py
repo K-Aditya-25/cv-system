@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from .constants import DEFAULT_ANTHROPIC_MODEL
 
-DEFAULT_GLM_TENSORIX_MODEL = "z-ai/glm-5.2"
-DEFAULT_KIMI_TENSORIX_MODEL = "moonshotai/kimi-k2.6"
+DEFAULT_GLM_TENSORIX_MODEL = "z-ai/glm-5"
+DEFAULT_KIMI_TENSORIX_MODEL = "moonshotai/kimi-k2.5"
 
 
 @dataclass(frozen=True)
@@ -32,23 +32,23 @@ def configured_model_routes() -> tuple[ModelRoute, ...]:
         ),
         ModelRoute(
             key="glm",
-            label="GLM 5.2 (Tensorix)",
+            label="GLM-5 (Tensorix)",
             provider="tensorix",
             model=os.environ.get(
                 "CV_GLM_MODEL",
                 os.environ.get("TENSORIX_GLM_MODEL", DEFAULT_GLM_TENSORIX_MODEL),
             ),
-            aliases=("2", "glm 5.2", "glm-5.2", "zai", "z.ai"),
+            aliases=("2", "glm 5", "glm-5", "glm 5.2", "glm-5.2", "zai", "z.ai"),
         ),
         ModelRoute(
             key="kimi",
-            label="Kimi (Tensorix)",
+            label="Kimi-K2.5 (Tensorix)",
             provider="tensorix",
             model=os.environ.get(
                 "CV_KIMI_MODEL",
                 os.environ.get("TENSORIX_KIMI_MODEL", DEFAULT_KIMI_TENSORIX_MODEL),
             ),
-            aliases=("3", "kimi k2.6", "kimi-k2.6", "moonshot"),
+            aliases=("3", "kimi k2.5", "kimi-k2.5", "kimi k2.6", "kimi-k2.6", "moonshot"),
         ),
     )
 

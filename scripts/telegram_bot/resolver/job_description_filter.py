@@ -39,6 +39,7 @@ def tensorix_description_filter(blocks: list[VisibleBlock], timeout: float = 10)
             system_prompt(), user_prompt(source), timeout,
             model=model,
             max_tokens=_max_tokens(),
+            response_format={"type": "json_object"},
         )
         data = parse_llm_json(raw)
     except Exception as exc:

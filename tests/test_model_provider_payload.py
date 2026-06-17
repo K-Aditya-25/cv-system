@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from scripts.job_creation.claude_payload import call_model_for_valid_payload
-from scripts.job_creation.model_catalog import resolve_model_choice
+from scripts.job_creation.model_catalog import model_route_for_key, resolve_model_choice
 from tests.pdf_fixtures import llm_payload, minimal_database
 
 
@@ -13,17 +13,20 @@ class ModelProviderPayloadTests(unittest.TestCase):
                 system_prompt="System",
                 user_prompt="User",
                 provider="tensorix",
-                model="z-ai/glm-5.2",
+                model="z-ai/glm-5",
                 database=minimal_database(),
                 allow_longer_cv=False,
             )
         self.assertEqual(job_config.company, "Target")
         self.assertEqual(payload["job_summary_text"], "Target engineer role.")
-        self.assertEqual(chat.call_args.kwargs["model"], "z-ai/glm-5.2")
+        self.assertEqual(chat.call_args.kwargs["model"], "z-ai/glm-5")
         self.assertEqual(chat.call_args.kwargs["purpose"], "Tensorix CV model")
         self.assertEqual(chat.call_args.kwargs["attempts"], 3)
+        self.assertEqual(chat.call_args.kwargs["response_format"], {"type": "json_object"})
 
     def test_model_catalog_resolves_numbered_tensorix_choices(self):
+        self.assertEqual(model_route_for_key("glm").model, "z-ai/glm-5")
+        self.assertEqual(model_route_for_key("kimi").model, "moonshotai/kimi-k2.5")
         self.assertEqual(resolve_model_choice("2").key, "glm")
         self.assertEqual(resolve_model_choice("kimi").key, "kimi")
         self.assertIsNone(resolve_model_choice("tensorix"))

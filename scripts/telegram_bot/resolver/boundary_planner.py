@@ -39,7 +39,9 @@ def tensorix_boundary(blocks: list[VisibleBlock], timeout: float = 5) -> Planned
         return PlannedBoundary(None, "Tensorix boundary planner disabled")
     prompt = _prompt(blocks)
     try:
-        raw = _run_with_timeout(lambda: tensorix_chat(_system_prompt(), prompt, timeout), timeout)
+        raw = _run_with_timeout(lambda: tensorix_chat(
+            _system_prompt(), prompt, timeout, response_format={"type": "json_object"},
+        ), timeout)
         data = parse_llm_json(raw)
     except _TimedOut:
         return PlannedBoundary(None, "Tensorix boundary planner timed out")

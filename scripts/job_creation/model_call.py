@@ -21,6 +21,7 @@ def call_model(system_prompt: str, user_prompt: str, provider: str, model: str) 
             max_tokens=_tensorix_max_tokens(),
             purpose="Tensorix CV model",
             attempts=_tensorix_attempts(),
+            response_format={"type": "json_object"},
         )
     raise IntakeError(f"Unsupported provider: {provider}")
 

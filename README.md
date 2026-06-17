@@ -165,7 +165,7 @@ company and role when available, then asks for a CV generation model and optiona
 runs the selected model route, and replies with the compiled PDF.
 
 Before asking for optional CV instructions, the bot asks which generation model to use. The default
-menu exposes Claude, GLM 5.2 through Tensorix, and Kimi through Tensorix. The chosen route is saved
+menu exposes Claude, GLM-5 through Tensorix, and Kimi-K2.5 through Tensorix. The chosen route is saved
 with the generated job folder and reused for later refinements of that CV.
 
 Job-page extraction is staged and generic rather than tied to one job board. The resolver first
@@ -205,8 +205,8 @@ ignored local env files used by the rest of the app:
 ```text
 TENSORIX_API_KEY=...
 CV_ROUTER_MODEL=minimax/minimax-m2.5  # optional default
-CV_GLM_MODEL=z-ai/glm-5.2             # optional CV generation override
-CV_KIMI_MODEL=moonshotai/kimi-k2.6    # optional CV generation override
+CV_GLM_MODEL=z-ai/glm-5               # optional CV generation override
+CV_KIMI_MODEL=moonshotai/kimi-k2.5    # optional CV generation override
 CV_TENSORIX_MAX_TOKENS=12000          # optional CV generation output budget
 CV_TENSORIX_TIMEOUT_SECONDS=240       # optional CV generation request timeout
 CV_TENSORIX_ATTEMPTS=3                # optional CV generation retry attempts

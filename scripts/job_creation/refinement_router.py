@@ -46,6 +46,7 @@ def _route_with_planner(feedback: str, context: Any) -> RefinementRoute:
     raw = tensorix_chat(
         render_prompt_template("refinement_router_system.md"),
         planner_user_prompt(feedback, context),
+        response_format={"type": "json_object"},
     )
     payload = parse_llm_json(raw)
     route = str(payload.get("route") or "")
