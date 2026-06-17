@@ -26,7 +26,7 @@ def save(api: TelegramApi, store: StateStore, session: Session, notice: str) -> 
 def clear(session: Session, state: str = "idle", active: int = 0) -> None:
     session.state, session.description, session.instructions = state, "", ""
     session.queued_feedback, session.pending_operation, session.pending_payload = "", "", ""
-    session.last_error, session.job_url, session.careers_url = "", "", ""
+    session.last_error, session.job_url, session.careers_url, session.model_key = "", "", "", ""
     session.request_id += 1
     session.session_active = active
 

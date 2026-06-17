@@ -47,7 +47,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual((session.state, session.description, session.queued_feedback), ("idle", "", ""))
         self.assertEqual((session.pending_operation, session.session_active), ("", 0))
 
-    def test_existing_database_adds_url_resolver_columns(self) -> None:
+    def test_existing_database_adds_new_session_columns(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "state.sqlite3"
             connection = sqlite3.connect(path)
@@ -64,6 +64,7 @@ class StateStoreTests(unittest.TestCase):
             connection.close()
             session = StateStore(path).session(42)
         self.assertEqual((session.job_url, session.careers_url, session.request_id), ("", "", 0))
+        self.assertEqual(session.model_key, "")
 
 
 if __name__ == "__main__":

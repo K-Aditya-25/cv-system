@@ -64,12 +64,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--provider",
-        choices=["prompt-only", "claude", "anthropic"],
+        choices=["prompt-only", "claude", "anthropic", "tensorix"],
         default=os.environ.get("CV_LLM_PROVIDER", "prompt-only"),
         help=(
             "Use prompt-only to write the prompt package without calling an LLM, "
-            "or claude to call the Anthropic Claude API. anthropic is accepted "
-            "as a backwards-compatible alias."
+            "claude to call the Anthropic Claude API, or tensorix to call an "
+            "OpenAI-compatible Tensorix model. anthropic is accepted as a "
+            "backwards-compatible alias."
         ),
     )
     parser.add_argument(
@@ -95,4 +96,3 @@ def parse_args() -> argparse.Namespace:
         help="Markdown/text file containing per-job CV requirements.",
     )
     return parser.parse_args()
-

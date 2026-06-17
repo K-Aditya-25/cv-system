@@ -4,13 +4,13 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from .claude_payload import call_claude_for_valid_payload
+from .claude_payload import call_model_for_valid_payload
 from .candidate_inventory import build_candidate_inventory
 from .cv_output import generate_cv
 from .job_files import append_revision_feedback, write_prompt_file, write_revised_job_files
 from .one_page import enforce_one_page_pdf
 from .prompting import render_prompt_template, yaml_text
-from .text_utils import explicitly_requests_longer_cv, is_claude_provider
+from .text_utils import explicitly_requests_longer_cv, is_llm_provider
 from .validation_core import report_skill_repairs, warn_selected_projects_without_portfolio_links
 from .errors import IntakeError
 
@@ -28,10 +28,10 @@ def refine_job_with_compact_prompt(
         write_prompt_file(prompt_path, system_prompt, user_prompt)
         print(f"Wrote compact refinement prompt to {prompt_path}")
         return prompt_path, None
-    if not is_claude_provider(args.provider):
+    if not is_llm_provider(args.provider):
         raise IntakeError(f"Unsupported provider: {args.provider}")
-    payload, job_config, selection, repairs = call_claude_for_valid_payload(
-        system_prompt=system_prompt, user_prompt=user_prompt, model=args.model,
+    payload, job_config, selection, repairs = call_model_for_valid_payload(
+        system_prompt=system_prompt, user_prompt=user_prompt, provider=args.provider, model=args.model,
         database=context.database,
         allow_longer_cv=explicitly_requests_longer_cv(
             context.cv_requirements, revision_feedback,
@@ -42,6 +42,9 @@ def refine_job_with_compact_prompt(
     write_revised_job_files(
         context.job_folder, revision_feedback, system_prompt, user_prompt,
         payload, job_config, selection,
+        llm_provider=args.provider,
+        llm_model=args.model,
+        llm_model_key=getattr(args, "model_key", ""),
     )
     tex_path = generate_cv(context.job_folder, context.database, job_config, selection)
     if not args.compile_pdf:
@@ -50,7 +53,8 @@ def refine_job_with_compact_prompt(
         job_folder=context.job_folder, database=context.database,
         job_description=context.job_description, cv_requirements=context.cv_requirements,
         candidate_inventory=build_candidate_inventory(context.database),
-        system_prompt=system_prompt, model=args.model, job_config=job_config,
+        system_prompt=system_prompt, provider=args.provider, model=args.model,
+        model_key=getattr(args, "model_key", ""), job_config=job_config,
         selection=selection, tex_path=tex_path,
         preserve_revision_feedback=revision_feedback,
     )

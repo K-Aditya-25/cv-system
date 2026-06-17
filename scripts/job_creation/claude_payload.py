@@ -5,7 +5,8 @@ from typing import Any
 
 from schemas.career_schema import CareerDatabase, JobConfig, Selection
 from .errors import IntakeError
-from .llm import call_anthropic, parse_llm_json
+from .llm import parse_llm_json
+from .model_call import call_model
 from .prompting import yaml_text
 from .skill_repair import validate_repaired_intake_payload
 
@@ -35,16 +36,17 @@ def build_validation_retry_prompt(
     )
 
 
-def call_claude_for_valid_payload(
+def call_model_for_valid_payload(
     *,
     system_prompt: str,
     user_prompt: str,
+    provider: str,
     model: str,
     database: CareerDatabase,
     allow_longer_cv: bool,
     max_validation_retries: int = 1,
 ) -> tuple[dict[str, Any], JobConfig, Selection, list[str]]:
-    raw_response = call_anthropic(system_prompt, user_prompt, model)
+    raw_response = call_model(system_prompt, user_prompt, provider, model)
     payload = parse_llm_json(raw_response)
     validation_error: str | None = None
     repairs: list[str] = []
@@ -67,8 +69,27 @@ def call_claude_for_valid_payload(
             database.skills,
             payload,
         )
-        raw_response = call_anthropic(system_prompt, retry_prompt, model)
+        raw_response = call_model(system_prompt, retry_prompt, provider, model)
         payload = parse_llm_json(raw_response)
 
     raise IntakeError(validation_error or "LLM response failed validation")
 
+
+def call_claude_for_valid_payload(
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    model: str,
+    database: CareerDatabase,
+    allow_longer_cv: bool,
+    max_validation_retries: int = 1,
+) -> tuple[dict[str, Any], JobConfig, Selection, list[str]]:
+    return call_model_for_valid_payload(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        provider="claude",
+        model=model,
+        database=database,
+        allow_longer_cv=allow_longer_cv,
+        max_validation_retries=max_validation_retries,
+    )

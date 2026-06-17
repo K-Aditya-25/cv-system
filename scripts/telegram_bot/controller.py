@@ -1,10 +1,10 @@
-import json
-from pathlib import Path
 from queue import Queue
 from scripts.job_creation.constants import DEFAULT_CV_REQUIREMENTS
+from scripts.job_creation.model_catalog import model_menu_text
 from .api import TelegramApi
 from .controller_actions import HELP, append, clear, hard_reset, resend, retry_pending, save, start
 from .controller_jobs import add_text_document, begin_refine, choose_refine
+from .controller_models import choose_model, start_create
 from .controller_url import route_url_text, status_text
 from .models import Session, WorkItem
 from .store import StateStore
@@ -41,7 +41,7 @@ class BotController:
         elif command == "/done":
             self._done(session)
         elif command == "/none" and session.state == "collecting_instructions":
-            self._start_create(session, DEFAULT_CV_REQUIREMENTS)
+            start_create(self.api, self.store, self.work, session, DEFAULT_CV_REQUIREMENTS)
         elif command == "/cancel" and session.state != "busy":
             clear(session)
             self._save(session, "Draft cleared.")
@@ -58,10 +58,12 @@ class BotController:
             self.api.send_message(session.chat_id, "Command unavailable in the current state. Use /help.")
     def _done(self, session: Session) -> None:
         if session.state == "collecting_description" and session.description:
-            session.state = "collecting_instructions"
-            self._save(session, "Send optional instructions in chunks, then /done. Use /none for defaults.")
+            session.state = "choosing_model"
+            self._save(session, model_menu_text())
+        elif session.state == "choosing_model":
+            self.api.send_message(session.chat_id, model_menu_text())
         elif session.state == "collecting_instructions":
-            self._start_create(session, session.instructions or DEFAULT_CV_REQUIREMENTS)
+            start_create(self.api, self.store, self.work, session, session.instructions or DEFAULT_CV_REQUIREMENTS)
         elif session.state == "recovery" and session.pending_operation:
             retry_pending(self.api, self.store, self.work, session)
         else:
@@ -71,6 +73,8 @@ class BotController:
             return
         if session.state == "choosing_refine":
             choose_refine(self.api, self.store, session, text)
+        elif session.state == "choosing_model":
+            choose_model(self.api, self.store, session, text)
         elif not session.session_active:
             self.api.send_message(session.chat_id, "Use /new before sending a job description.")
         elif session.state == "busy":
@@ -91,8 +95,5 @@ class BotController:
             start(self.api, self.store, self.work, session, "refine", text, "Refining CV.")
         else:
             self.api.send_message(session.chat_id, "Use /new before sending a job description.")
-    def _start_create(self, session: Session, instructions: str) -> None:
-        payload = json.dumps({"description": session.description, "instructions": instructions})
-        start(self.api, self.store, self.work, session, "create", payload, "Generating CV.")
     def _save(self, session: Session, notice: str) -> None:
         save(self.api, self.store, session, notice)

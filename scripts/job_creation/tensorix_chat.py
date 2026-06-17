@@ -19,11 +19,17 @@ def tensorix_chat(
     *,
     model: str | None = None,
     max_tokens: int = 500,
+    purpose: str = "Tensorix router",
 ) -> str:
     api_key = get_env_secret("TENSORIX_API_KEY")
     if not api_key:
         raise IntakeError("TENSORIX_API_KEY is not set in the environment, .env.local, or .env")
-    base_url = os.environ.get("CV_ROUTER_BASE_URL", DEFAULT_TENSORIX_BASE_URL).rstrip("/")
+    base_url = (
+        os.environ.get("CV_TENSORIX_BASE_URL")
+        or os.environ.get("TENSORIX_BASE_URL")
+        or os.environ.get("CV_ROUTER_BASE_URL")
+        or DEFAULT_TENSORIX_BASE_URL
+    ).rstrip("/")
     payload = {
         "model": model or os.environ.get("CV_ROUTER_MODEL", DEFAULT_ROUTER_MODEL),
         "messages": [
@@ -44,18 +50,18 @@ def tensorix_chat(
             response_payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
-        raise IntakeError(f"Tensorix router request failed: HTTP {exc.code}: {details}") from exc
+        raise IntakeError(f"{purpose} request failed: HTTP {exc.code}: {details}") from exc
     except urllib.error.URLError as exc:
-        raise IntakeError(f"Tensorix router request failed: {exc.reason}") from exc
-    return _message_content(response_payload)
+        raise IntakeError(f"{purpose} request failed: {exc.reason}") from exc
+    return _message_content(response_payload, purpose)
 
 
-def _message_content(payload: dict) -> str:
+def _message_content(payload: dict, purpose: str = "Tensorix router") -> str:
     choices = payload.get("choices") or []
     if not choices:
-        raise IntakeError("Tensorix router response did not contain choices")
+        raise IntakeError(f"{purpose} response did not contain choices")
     message = choices[0].get("message") or {}
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise IntakeError("Tensorix router response did not contain message text")
+        raise IntakeError(f"{purpose} response did not contain message text")
     return content.strip()

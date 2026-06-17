@@ -25,6 +25,7 @@ class StateStore:
             "job_url": "TEXT NOT NULL DEFAULT ''",
             "careers_url": "TEXT NOT NULL DEFAULT ''",
             "request_id": "INTEGER NOT NULL DEFAULT 0",
+            "model_key": "TEXT NOT NULL DEFAULT ''",
         }
         for name, definition in additions.items():
             if name not in columns:
@@ -80,6 +81,7 @@ class StateStore:
             self.connection.execute(
                 "UPDATE sessions SET state='idle', description='', instructions='', "
                 "queued_feedback='', pending_operation='', pending_payload='', last_error='', "
-                "session_active=0, job_url='', careers_url='', request_id=request_id + 1"
+                "session_active=0, job_url='', careers_url='', model_key='', "
+                "request_id=request_id + 1"
             )
             self.connection.commit()

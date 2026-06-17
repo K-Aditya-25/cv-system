@@ -161,8 +161,12 @@ fails and their API keys are configured. Direct LinkedIn and other public job UR
 without either search key. If URL intake cannot resolve the posting, the bot explicitly asks for a
 careers-page or direct job-post URL retry. Pasted text chunks and UTF-8 `.txt` documents remain a
 deterministic fallback. The bot reports progress in plain language and confirms the extracted
-company and role when available, then asks for optional CV instructions, runs the existing Claude
-workflow, and replies with the compiled PDF.
+company and role when available, then asks for a CV generation model and optional CV instructions,
+runs the selected model route, and replies with the compiled PDF.
+
+Before asking for optional CV instructions, the bot asks which generation model to use. The default
+menu exposes Claude, GLM 5.2 through Tensorix, and Kimi through Tensorix. The chosen route is saved
+with the generated job folder and reused for later refinements of that CV.
 
 Job-page extraction is staged and generic rather than tied to one job board. The resolver first
 uses structured `JobPosting` JSON-LD when present, then scores visible DOM blocks to isolate the
@@ -201,6 +205,8 @@ ignored local env files used by the rest of the app:
 ```text
 TENSORIX_API_KEY=...
 CV_ROUTER_MODEL=minimax/minimax-m2.5  # optional default
+CV_GLM_MODEL=z-ai/glm-5.2             # optional CV generation override
+CV_KIMI_MODEL=moonshotai/kimi-k2.6    # optional CV generation override
 ```
 
 For the macOS Login Service, either keep the key in `.env.local`/`.env` or set it in launchd's user

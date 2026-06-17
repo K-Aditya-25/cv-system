@@ -57,13 +57,15 @@ class BotRuntime:
                 return
             if item.operation == "create":
                 payload = json.loads(item.payload)
-                folder, pdf = self.workflow.create(payload["description"], payload["instructions"])
+                model_key = str(payload.get("model_key") or session.model_key or "")
+                folder, pdf = self.workflow.create(payload["description"], payload["instructions"], model_key)
                 if not current(self.store.session(item.chat_id), item):
                     return
                 session.active_job_folder = str(folder)
+                session.model_key = model_key
                 self.store.save(session)
             elif item.operation == "refine":
-                pdf = self.workflow.refine(Path(session.active_job_folder), item.payload)
+                pdf = self.workflow.refine(Path(session.active_job_folder), item.payload, session.model_key)
             else:
                 raise ValueError(f"Unknown work operation: {item.operation}")
             self._complete_item(item, pdf)

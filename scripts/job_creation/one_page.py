@@ -13,7 +13,6 @@ from .prompting import write_yaml
 from .validation_core import warn_selected_projects_without_portfolio_links
 
 
-
 def _try_compact_margin(job_folder: Path, database: CareerDatabase, job_config: JobConfig, selection: Selection) -> tuple[Path, int, str]:
     compact_margin = compact_page_margin(job_config)
     print(f"Compiled PDF has {{_try_compact_margin.page_count}} pages; retrying with compact {compact_margin} page margins before using an LLM revision.")
@@ -82,7 +81,18 @@ def enforce_one_page_pdf(**context: Any) -> tuple[Path, int]:
                 raise IntakeError("One-page PDF enforcement exhausted the compile-PDF LLM call budget " f"of {MAX_COMPILE_PDF_LLM_CALLS} total calls; last revision was invalid: " f"{validation_error}") from exc
             print("One-page revision failed validation; using the next and final automatic LLM call for a corrected revision.")
             continue
-        write_revised_job_files(context["job_folder"], revision_feedback, context["system_prompt"], user_prompt, payload, job_config, selection)
+        write_revised_job_files(
+            context["job_folder"],
+            revision_feedback,
+            context["system_prompt"],
+            user_prompt,
+            payload,
+            job_config,
+            selection,
+            llm_provider=context.get("provider", "claude"),
+            llm_model=context["model"],
+            llm_model_key=context.get("model_key", ""),
+        )
         tex_path, page_count = _compile_revision(context["job_folder"], context["database"], job_config, selection, tex_path)
         if page_count == ONE_PAGE_LIMIT:
             return tex_path, page_count

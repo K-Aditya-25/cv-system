@@ -9,6 +9,7 @@ from .controller_actions import clear
 from .job_catalog import available_jobs, numbered_jobs
 from .models import Session
 from .store import StateStore
+from .workflow import job_model_key
 
 
 def begin_refine(api: TelegramApi, store: StateStore, session: Session) -> None:
@@ -28,6 +29,7 @@ def choose_refine(api: TelegramApi, store: StateStore, session: Session, text: s
         return
     job = jobs[int(text) - 1]
     session.active_job_folder, session.latest_pdf = str(job.folder), str(job.pdf)
+    session.model_key = job_model_key(job.folder)
     session.state = "idle"
     store.save(session)
     api.send_message(session.chat_id, f"Selected {job.label}. Send refinement feedback.")

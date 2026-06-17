@@ -5,7 +5,7 @@ from pathlib import Path
 
 from schemas.career_schema import CareerDatabase
 from scripts.generate_cv import load_yaml
-from .claude_payload import call_claude_for_valid_payload
+from .claude_payload import call_model_for_valid_payload
 from .cv_output import generate_cv
 from .errors import IntakeError
 from .folders import unique_job_folder
@@ -14,7 +14,7 @@ from .one_page import enforce_one_page_pdf
 from .paths import ROOT
 from .candidate_inventory import build_candidate_inventory
 from .prompting import render_prompt_template
-from .text_utils import explicitly_requests_longer_cv, job_config_folder_id, is_claude_provider, slugify, timestamped_job_id
+from .text_utils import explicitly_requests_longer_cv, is_llm_provider, job_config_folder_id, slugify, timestamped_job_id
 from .validation_core import report_skill_repairs, warn_selected_projects_without_portfolio_links
 
 def create_job_from_inputs(
@@ -45,15 +45,16 @@ def create_job_from_inputs(
         (job_folder / "cv_requirements.md").write_text(cv_requirements + "\n", encoding="utf-8")
         write_prompt_file(job_folder / "llm_prompt.md", system_prompt, user_prompt)
         print(f"Wrote prompt package to {job_folder}")
-        print("Run again with --provider claude to generate YAML and CV automatically.")
+        print("Run again with --provider claude or --provider tensorix to generate YAML and CV automatically.")
         return job_folder, job_folder / "llm_prompt.md", None
 
-    if not is_claude_provider(args.provider):
+    if not is_llm_provider(args.provider):
         raise IntakeError(f"Unsupported provider: {args.provider}")
 
-    payload, job_config, selection, repairs = call_claude_for_valid_payload(
+    payload, job_config, selection, repairs = call_model_for_valid_payload(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
+        provider=args.provider,
         model=args.model,
         database=database,
         allow_longer_cv=explicitly_requests_longer_cv(cv_requirements),
@@ -71,6 +72,9 @@ def create_job_from_inputs(
         payload,
         job_config,
         selection,
+        llm_provider=args.provider,
+        llm_model=args.model,
+        llm_model_key=getattr(args, "model_key", ""),
     )
     tex_path = generate_cv(job_folder, database, job_config, selection)
     pdf_page_count: int | None = None
@@ -82,11 +86,11 @@ def create_job_from_inputs(
             cv_requirements=cv_requirements,
             candidate_inventory=candidate_inventory,
             system_prompt=system_prompt,
+            provider=args.provider,
             model=args.model,
+            model_key=getattr(args, "model_key", ""),
             job_config=job_config,
             selection=selection,
             tex_path=tex_path,
         )
     return job_folder, tex_path, pdf_page_count
-
-

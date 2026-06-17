@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from schemas.career_schema import JobConfig, Selection
+from .llm_metadata import write_llm_metadata
 from .prompting import write_yaml
 
 
@@ -34,6 +35,10 @@ def write_job_files(
     payload: dict[str, Any],
     job_config: JobConfig,
     selection: Selection,
+    *,
+    llm_provider: str = "",
+    llm_model: str = "",
+    llm_model_key: str = "",
 ) -> None:
     job_folder.mkdir(parents=True, exist_ok=False)
     (job_folder / "job_description.md").write_text(job_description + "\n", encoding="utf-8")
@@ -41,6 +46,7 @@ def write_job_files(
     (job_folder / "llm_prompt.md").write_text(_prompt_text(system_prompt, user_prompt), encoding="utf-8")
     write_yaml(job_folder / "job_config.yaml", job_config.model_dump(mode="json"))
     write_yaml(job_folder / "selection.yaml", selection.model_dump(mode="json"))
+    write_llm_metadata(job_folder, llm_provider, llm_model, llm_model_key)
     _write_summary_and_rationale(job_folder, payload)
 
 
@@ -67,9 +73,22 @@ def append_one_page_enforcement_prompt(job_folder: Path, attempt: int, page_coun
         )
 
 
-def write_revised_job_files(job_folder: Path, revision_feedback: str, system_prompt: str, user_prompt: str, payload: dict[str, Any], job_config: JobConfig, selection: Selection) -> None:
+def write_revised_job_files(
+    job_folder: Path,
+    revision_feedback: str,
+    system_prompt: str,
+    user_prompt: str,
+    payload: dict[str, Any],
+    job_config: JobConfig,
+    selection: Selection,
+    *,
+    llm_provider: str = "",
+    llm_model: str = "",
+    llm_model_key: str = "",
+) -> None:
     append_revision_feedback(job_folder, revision_feedback)
     write_prompt_file(job_folder / "llm_refine_prompt.md", system_prompt, user_prompt)
     write_yaml(job_folder / "job_config.yaml", job_config.model_dump(mode="json"))
     write_yaml(job_folder / "selection.yaml", selection.model_dump(mode="json"))
+    write_llm_metadata(job_folder, llm_provider, llm_model, llm_model_key)
     _write_summary_and_rationale(job_folder, payload)

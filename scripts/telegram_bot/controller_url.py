@@ -45,6 +45,7 @@ def status_text(session: Session) -> str:
         "collecting_description": "Collecting a job description. Send text, a .txt file, or one URL.",
         "resolving_job_url": "Checking the job posting URL in the background.",
         "awaiting_careers_url": "Waiting for a careers-page URL retry, pasted text, or a .txt file.",
+        "choosing_model": "Waiting for a CV generation model choice.",
         "collecting_instructions": "Job description is ready. Send optional instructions or /none.",
         "busy": "Generating or refining a CV in the background.",
         "recovery": "The last CV operation failed. Use /done to retry or /cancel.",

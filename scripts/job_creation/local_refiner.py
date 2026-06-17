@@ -28,6 +28,9 @@ def refine_job_with_local_edit(args: argparse.Namespace, context: Any, feedback:
     write_revised_job_files(
         context.job_folder, feedback, "Deterministic local edit; no LLM request was sent.",
         feedback.strip(), payload, context.job_config, context.selection,
+        llm_provider=getattr(args, "provider", ""),
+        llm_model=getattr(args, "model", ""),
+        llm_model_key=getattr(args, "model_key", ""),
     )
     warn_selected_projects_without_portfolio_links(context.database, context.selection)
     tex_path = generate_cv(context.job_folder, context.database, context.job_config, context.selection)
@@ -37,7 +40,9 @@ def refine_job_with_local_edit(args: argparse.Namespace, context: Any, feedback:
         job_folder=context.job_folder, database=context.database,
         job_description=context.job_description, cv_requirements=context.cv_requirements,
         candidate_inventory=build_candidate_inventory(context.database),
-        system_prompt="Deterministic local edit; no LLM request was sent.", model=args.model,
+        system_prompt="Deterministic local edit; no LLM request was sent.",
+        provider=getattr(args, "provider", "claude"), model=args.model,
+        model_key=getattr(args, "model_key", ""),
         job_config=context.job_config, selection=context.selection, tex_path=tex_path,
         preserve_revision_feedback=feedback,
     )

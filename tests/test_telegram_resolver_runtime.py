@@ -36,14 +36,15 @@ class TelegramResolverRuntimeTests(unittest.TestCase):
         self.store.save(Session(42, state="resolving_job_url", pending_operation="resolve_url",
                                 request_id=request_id, session_active=1))
 
-    def test_resolved_description_advances_to_instructions(self):
+    def test_resolved_description_advances_to_model_choice(self):
         self.save_resolving()
         posting = ExtractedPosting("full role", JobMetadata(company="Acme", role="Engineer"),
                                    "https://jobs.example/42")
         apply_result(self.runtime, self.item(), ResolutionResult("resolved", posting=posting))
         session = self.store.session(42)
-        self.assertEqual((session.state, session.description), ("collecting_instructions", "full role"))
+        self.assertEqual((session.state, session.description), ("choosing_model", "full role"))
         self.assertIn("Acme - Engineer", self.runtime.api.messages[-1][1])
+        self.assertIn("Choose the model", self.runtime.api.messages[-1][1])
 
     def test_automatic_failure_requests_explicit_careers_url(self):
         self.save_resolving()

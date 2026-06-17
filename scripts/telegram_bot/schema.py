@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     job_url TEXT NOT NULL DEFAULT '',
     careers_url TEXT NOT NULL DEFAULT '',
     request_id INTEGER NOT NULL DEFAULT 0,
+    model_key TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS metadata (
@@ -25,5 +26,5 @@ CREATE TABLE IF NOT EXISTS metadata (
 SESSION_COLUMNS = (
     "chat_id", "state", "description", "instructions", "active_job_folder", "latest_pdf",
     "queued_feedback", "pending_operation", "pending_payload", "last_error", "session_active",
-    "job_url", "careers_url", "request_id",
+    "job_url", "careers_url", "request_id", "model_key",
 )

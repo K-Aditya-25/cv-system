@@ -5,7 +5,7 @@ from pathlib import Path
 
 from schemas.career_schema import CareerDatabase, JobConfig, Selection
 from scripts.generate_cv import load_yaml
-from .claude_payload import call_claude_for_valid_payload
+from .claude_payload import call_model_for_valid_payload
 from .constants import DEFAULT_CV_REQUIREMENTS
 from .cv_output import generate_cv
 from .errors import IntakeError
@@ -15,7 +15,7 @@ from .paths import ROOT
 from .candidate_inventory import build_candidate_inventory
 from .prompting import render_prompt_template, yaml_text
 from .resolvers import read_text
-from .text_utils import explicitly_requests_longer_cv, is_claude_provider
+from .text_utils import explicitly_requests_longer_cv, is_llm_provider
 from .validation_core import report_skill_repairs, warn_selected_projects_without_portfolio_links
 
 def refine_job_with_feedback(
@@ -55,29 +55,25 @@ def refine_job_with_feedback(
         append_revision_feedback(job_folder, revision_feedback)
         write_prompt_file(job_folder / "llm_refine_prompt.md", system_prompt, user_prompt)
         print(f"Wrote refinement prompt to {job_folder / 'llm_refine_prompt.md'}")
-        print("Run again with --provider claude to revise YAML and regenerate the CV.")
+        print("Run again with --provider claude or --provider tensorix to revise YAML and regenerate the CV.")
         return job_folder / "llm_refine_prompt.md", None
 
-    if not is_claude_provider(args.provider):
+    if not is_llm_provider(args.provider):
         raise IntakeError(f"Unsupported provider: {args.provider}")
 
-    payload, job_config, selection, repairs = call_claude_for_valid_payload(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        model=args.model,
+    payload, job_config, selection, repairs = call_model_for_valid_payload(
+        system_prompt=system_prompt, user_prompt=user_prompt,
+        provider=args.provider, model=args.model,
         database=database,
         allow_longer_cv=explicitly_requests_longer_cv(cv_requirements, revision_feedback),
     )
     report_skill_repairs(repairs)
     warn_selected_projects_without_portfolio_links(database, selection)
     write_revised_job_files(
-        job_folder,
-        revision_feedback,
-        system_prompt,
-        user_prompt,
-        payload,
-        job_config,
-        selection,
+        job_folder, revision_feedback, system_prompt, user_prompt, payload, job_config, selection,
+        llm_provider=args.provider,
+        llm_model=args.model,
+        llm_model_key=getattr(args, "model_key", ""),
     )
     tex_path = generate_cv(job_folder, database, job_config, selection)
     pdf_page_count: int | None = None
@@ -89,7 +85,9 @@ def refine_job_with_feedback(
             cv_requirements=cv_requirements,
             candidate_inventory=candidate_inventory,
             system_prompt=system_prompt,
+            provider=args.provider,
             model=args.model,
+            model_key=getattr(args, "model_key", ""),
             job_config=job_config,
             selection=selection,
             tex_path=tex_path,

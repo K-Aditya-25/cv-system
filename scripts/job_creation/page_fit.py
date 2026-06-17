@@ -88,5 +88,8 @@ def should_retry_llm_revision_error(error: IntakeError) -> bool:
         "ANTHROPIC_API_KEY",
         "Anthropic API request failed",
         "Anthropic API response did not contain text",
+        "TENSORIX_API_KEY",
+        "Tensorix CV model request failed",
+        "Tensorix CV model response did not contain",
     )
     return not message.startswith(non_retryable_prefixes)

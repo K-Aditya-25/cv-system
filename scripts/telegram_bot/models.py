@@ -20,6 +20,7 @@ class Session:
     job_url: str = ""
     careers_url: str = ""
     request_id: int = 0
+    model_key: str = ""
 
     @property
     def pdf_path(self) -> Path | None:

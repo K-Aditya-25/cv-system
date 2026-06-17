@@ -19,9 +19,19 @@ from scripts.job_creation.validation_core import selected_projects_without_portf
 
 def call_claude_for_valid_payload(**kwargs: Any) -> tuple[Any, Any, Any, list[str]]:
     import scripts.job_creation.claude_payload as claude_payload
+    import scripts.job_creation.model_call as model_call
 
-    claude_payload.call_anthropic = call_anthropic
+    model_call.call_anthropic = call_anthropic
     return claude_payload.call_claude_for_valid_payload(**kwargs)
+
+
+def call_model_for_valid_payload(**kwargs: Any) -> tuple[Any, Any, Any, list[str]]:
+    import scripts.job_creation.claude_payload as claude_payload
+    import scripts.job_creation.model_call as model_call
+
+    model_call.call_anthropic = call_anthropic
+    return claude_payload.call_model_for_valid_payload(**kwargs)
+
 
 def assert_pdf_is_exactly_one_page(pdf_path: Path) -> int:
     from scripts.job_creation.constants import ONE_PAGE_LIMIT
@@ -33,14 +43,15 @@ def assert_pdf_is_exactly_one_page(pdf_path: Path) -> int:
 
 
 def enforce_one_page_pdf(**context: Any) -> tuple[Path, int]:
-    import scripts.job_creation.claude_payload as claude_payload
     import scripts.job_creation.cv_output as cv_output
+    import scripts.job_creation.model_call as model_call
     import scripts.job_creation.one_page as one_page
+    import scripts.job_creation.one_page_revision as one_page_revision
 
     cv_output.compile_pdf_and_count_pages = compile_pdf_and_count_pages
     cv_output.generate_cv = generate_cv
-    claude_payload.call_anthropic = call_anthropic
-    one_page.call_claude_for_valid_payload = call_claude_for_valid_payload
+    model_call.call_anthropic = call_anthropic
+    one_page_revision.call_model_for_valid_payload = call_model_for_valid_payload
     one_page.compile_pdf_and_count_pages = compile_pdf_and_count_pages
     one_page.generate_cv = generate_cv
     return one_page.enforce_one_page_pdf(**context)

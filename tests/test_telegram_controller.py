@@ -13,11 +13,12 @@ class TelegramControllerTests(ControllerTestCase):
         self.assertIn("99", self.api.messages[-1][1])
 
     def test_chunks_and_none_enqueue_generation(self):
-        for text in ("/new", "first", "second", "/done", "/none"):
+        for text in ("/new", "first", "second", "/done", "2", "/none"):
             self.controller.handle(update(text))
         item = self.work.get_nowait()
         self.assertEqual(item.operation, "create")
         self.assertIn("first\\n\\nsecond", item.payload)
+        self.assertIn('"model_key": "glm"', item.payload)
         self.assertEqual(self.store.session(42).state, "busy")
 
     def test_text_file_adds_description_chunk(self):

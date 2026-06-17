@@ -38,11 +38,17 @@ def explicitly_requests_longer_cv(*texts: str) -> bool:
 
 
 def normalize_provider(provider: str) -> str:
+    provider = (provider or "").strip().lower()
     if provider == "anthropic":
         return "claude"
+    if provider in {"openai-compatible", "openai_compatible"}:
+        return "tensorix"
     return provider
 
 
 def is_claude_provider(provider: str) -> bool:
     return normalize_provider(provider) == "claude"
 
+
+def is_llm_provider(provider: str) -> bool:
+    return normalize_provider(provider) in {"claude", "tensorix"}

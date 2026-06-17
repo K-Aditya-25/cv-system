@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from scripts.job_creation.env import get_env_secret
+from scripts.job_creation.model_catalog import model_menu_text
 
 from .models import Session, WorkItem
 from .resolver.browser import BrowserConfig, PlaywrightBrowserAdapter
@@ -22,7 +23,7 @@ def apply_result(runtime: Any, item: WorkItem, result: Any) -> None:
     if not current(session, item):
         return
     if result.status == "resolved" and result.posting:
-        session.description, session.state = result.posting.description, "collecting_instructions"
+        session.description, session.state = result.posting.description, "choosing_model"
         session.pending_operation, session.pending_payload, session.last_error = "", "", ""
         runtime.store.save(session)
         runtime.api.send_message(item.chat_id, _success_message(result))
@@ -57,7 +58,7 @@ def _success_message(result: ResolutionResult) -> str:
     metadata = result.posting.metadata
     details = " - ".join(part for part in (metadata.company, metadata.role) if part)
     found = f"Job description found: {details}." if details else "Job description found."
-    return f"{found}\nSend optional instructions, then /done. Use /none for defaults."
+    return f"{found}\n{model_menu_text()}"
 
 
 def _discover(query: str) -> tuple[str, ...]:
