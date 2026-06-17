@@ -2,7 +2,8 @@ from queue import Queue
 from scripts.job_creation.constants import DEFAULT_CV_REQUIREMENTS
 from scripts.job_creation.model_catalog import model_menu_text
 from .api import TelegramApi
-from .controller_actions import HELP, append, clear, hard_reset, resend, retry_pending, save, start
+from .controller_actions import HELP, append, clear, hard_reset, resend, retry_pending, save
+from .controller_actions import start_refinement
 from .controller_jobs import add_text_document, begin_refine, choose_refine
 from .controller_models import choose_model, start_create
 from .controller_url import route_url_text, status_text
@@ -92,7 +93,7 @@ class BotController:
             if not session.active_job_folder and session.pdf_path:
                 session.active_job_folder = str(session.pdf_path.parent)
                 self.store.save(session)
-            start(self.api, self.store, self.work, session, "refine", text, "Refining CV.")
+            start_refinement(self.api, self.store, self.work, session, text)
         else:
             self.api.send_message(session.chat_id, "Use /new before sending a job description.")
     def _save(self, session: Session, notice: str) -> None:

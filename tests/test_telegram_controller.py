@@ -41,10 +41,13 @@ class TelegramControllerTests(ControllerTestCase):
 
     def test_active_session_repairs_missing_folder_for_refinement(self):
         self.store.save(Session(42, latest_pdf="/jobs/acme/cv.pdf", session_active=1))
-        self.controller.handle(update("discard the Hashnode link"))
+        with patch("scripts.telegram_bot.controller_actions.log_event") as log_event:
+            self.controller.handle(update("discard the Hashnode link"))
         item = self.work.get_nowait()
         self.assertEqual(item.operation, "refine")
         self.assertEqual(self.store.session(42).active_job_folder, "/jobs/acme")
+        self.assertEqual(log_event.call_args.kwargs["operation"], "refine_queued")
+        self.assertEqual(log_event.call_args.kwargs["feedback_chars"], 25)
 
     def test_idle_text_after_restart_requires_new(self):
         self.store.save(Session(42, latest_pdf="/jobs/acme/cv.pdf"))

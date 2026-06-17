@@ -18,8 +18,9 @@ Telegram /new
        -> if direct extraction fails, search with Tavily, then Brave, when configured
        -> ask for an explicit careers-page or job-post URL retry when needed
   -> or paste description chunks or upload a UTF-8 .txt document
+  -> ask which CV generation model to use
   -> ask for optional CV instructions
-  -> run existing Claude generation workflow
+  -> run selected Claude or Tensorix generation workflow
   -> compile and verify one-page PDF
   -> send PDF back through Telegram
 
@@ -55,9 +56,10 @@ flowchart TD
     R --> X["Retry Explicit URL and Careers-Page Listing Links"]
     X -->|Resolved| S
     X -->|Still Unresolved| P
-    S --> G["CV Workflow Service"]
-    P --> G
-    G --> H["Claude Selection and Refinement"]
+    S --> M["Choose CV Generation Model"]
+    P --> M
+    M --> G["CV Workflow Service"]
+    G --> H["Selected Provider: Claude or Tensorix"]
     H --> I["TeX Generation"]
     I --> J["PDF Compilation and One-Page Check"]
     J --> K["Send PDF Document"]
@@ -154,6 +156,9 @@ Guardrails:
 - Process generation in a background worker so the bot remains responsive.
 - Send plain-language status updates while resolving a URL, retrieving a posting, generating a CV,
   and compiling a PDF. Confirm the extracted company and role when available.
+- Log backend model decisions and output metadata with `[model.*]` and `[llm.*]` prefixes, including
+  model key, provider, model ID, finish reason, token usage, response length/hash, parsed JSON keys,
+  and generated file paths. Do not log API keys, raw prompts, full model JSON, or generated CV text.
 - Apply URL safety checks before retrieval: accept public HTTPS URLs only and reject unsafe targets.
 - Serialize refinements per chat to avoid two messages updating the same job folder concurrently.
 - Retain the existing job folders as an audit trail.

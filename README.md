@@ -220,6 +220,18 @@ launchctl setenv TENSORIX_API_KEY ...
 scripts/telegram_bot_service.sh restart
 ```
 
+The service logs model decisions and model-output metadata to `logs/telegram_bot.stdout.log`.
+Relevant prefixes include:
+
+- `[model.select]`: Telegram model choice, provider, and concrete model ID.
+- `[model.operation]`: queued create/refine operation and input text sizes.
+- `[model.workflow]`: selected provider/model for generation or refinement and output file paths.
+- `[llm.model_call]` / `[llm.model_output]`: provider call metadata and response size/hash.
+- `[llm.tensorix_request]` / `[llm.tensorix_response]`: Tensorix JSON-mode request settings,
+  finish reason, token usage when returned, and response size/hash.
+- `[llm.parse_ok]` / `[llm.parse_error]`: JSON parsing result, top-level keys, and safe response
+  diagnostics. Raw prompts, API keys, and full model output are not written to logs.
+
 Use `/whoami` in a private chat to discover its numeric chat ID. `CV_MASTER_DATA` must be set
 explicitly when the bot starts so it cannot accidentally generate a CV from example data:
 

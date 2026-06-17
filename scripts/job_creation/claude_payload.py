@@ -5,7 +5,7 @@ from typing import Any
 
 from schemas.career_schema import CareerDatabase, JobConfig, Selection
 from .errors import IntakeError
-from .llm import parse_llm_json
+from .logged_json import parse_logged_llm_json
 from .model_call import call_model
 from .prompting import yaml_text
 from .skill_repair import validate_repaired_intake_payload
@@ -47,7 +47,7 @@ def call_model_for_valid_payload(
     max_validation_retries: int = 1,
 ) -> tuple[dict[str, Any], JobConfig, Selection, list[str]]:
     raw_response = call_model(system_prompt, user_prompt, provider, model)
-    payload = parse_llm_json(raw_response)
+    payload = parse_logged_llm_json(raw_response, provider, model, 0)
     validation_error: str | None = None
     repairs: list[str] = []
 
@@ -70,7 +70,7 @@ def call_model_for_valid_payload(
             payload,
         )
         raw_response = call_model(system_prompt, retry_prompt, provider, model)
-        payload = parse_llm_json(raw_response)
+        payload = parse_logged_llm_json(raw_response, provider, model, attempt + 1)
 
     raise IntakeError(validation_error or "LLM response failed validation")
 

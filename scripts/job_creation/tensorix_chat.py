@@ -11,6 +11,7 @@ from typing import Any
 from .chat_response import chat_message_text
 from .env import get_env_secret
 from .errors import IntakeError
+from .model_logging import log_event, text_hash
 
 DEFAULT_TENSORIX_BASE_URL = "https://api.tensorix.ai/v1"
 DEFAULT_ROUTER_MODEL = "minimax/minimax-m2.5"
@@ -50,8 +51,23 @@ def tensorix_chat(
     data = json.dumps(payload).encode("utf-8")
     url = f"{base_url}/chat/completions"
     headers = {"content-type": "application/json", "authorization": f"Bearer {api_key}"}
+    log_event(
+        "llm.tensorix_request", purpose=purpose, model=payload["model"],
+        max_tokens=max_tokens, timeout_s=request_timeout, attempts=attempts,
+        json_mode=response_format == {"type": "json_object"},
+    )
     response_payload = _post_json(url, data, headers, request_timeout, purpose, attempts)
-    return chat_message_text(response_payload, purpose)
+    content = chat_message_text(response_payload, purpose)
+    choice = (response_payload.get("choices") or [{}])[0]
+    usage = response_payload.get("usage") or {}
+    log_event(
+        "llm.tensorix_response", purpose=purpose,
+        model=response_payload.get("model") or payload["model"],
+        finish_reason=choice.get("finish_reason"), content_chars=len(content),
+        content_sha=text_hash(content), prompt_tokens=usage.get("prompt_tokens"),
+        completion_tokens=usage.get("completion_tokens"), total_tokens=usage.get("total_tokens"),
+    )
+    return content
 
 
 def _post_json(
@@ -59,8 +75,7 @@ def _post_json(
     data: bytes,
     headers: dict[str, str],
     timeout: float,
-    purpose: str,
-    attempts: int,
+    purpose: str, attempts: int,
 ) -> dict[str, Any]:
     attempts = max(1, attempts)
     last_error: Exception | None = None
@@ -80,7 +95,6 @@ def _post_json(
             last_error = exc
         time.sleep(min(2 ** attempt, 8))
     raise IntakeError(f"{purpose} request failed after {attempts} attempt(s): {last_error}")
-
 
 def _retry_http(exc: urllib.error.HTTPError) -> bool:
     return exc.code in {408, 409, 425, 429} or exc.code >= 500

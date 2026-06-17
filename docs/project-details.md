@@ -114,6 +114,11 @@ do not want to send to an external API.
 
 The API key is not included in prompts, job files, or generated CVs. The Claude workflow script reads `ANTHROPIC_API_KEY` from the process environment, `.env.local`, or `.env`.
 
+When Tensorix is selected as the CV generation provider, Tensorix receives the same job description,
+CV requirements, current job state, and compact candidate inventory that the Claude generation path
+uses. Tensorix calls use the OpenAI-compatible `https://api.tensorix.ai/v1` endpoint, documented
+model IDs such as `z-ai/glm-5` and `moonshotai/kimi-k2.5`, and JSON mode for structured responses.
+
 The optional Tensorix refinement router reads `TENSORIX_API_KEY` from the process environment,
 `.env.local`, or `.env`. It receives refinement feedback, current job config, a selected-ID summary,
 and current generated TeX so it can choose between local edit, compact refinement, and full-context
@@ -166,6 +171,7 @@ Each job folder contains:
 Claude-generated job folders can also include:
 
 - `cv_requirements.md`
+- `llm_model.yaml`
 - `llm_prompt.md`
 - `llm_refine_prompt.md`
 - `one_page_enforcement.md`
@@ -174,6 +180,30 @@ Claude-generated job folders can also include:
 - `revision_feedback.md`
 - generated `.tex`
 - compiled `.pdf`
+
+`llm_model.yaml` records the provider, concrete model ID, and model key used for generation. Later
+Telegram refinements use this file to keep a CV on the same backend unless a new model is selected.
+
+## Operational Logs
+
+The macOS LaunchAgent writes stdout to `logs/telegram_bot.stdout.log` and stderr to
+`logs/telegram_bot.stderr.log`. Model-related stdout lines are structured as
+`[prefix] key=value ...` records:
+
+- `[model.select]`: Telegram chat selected a model key, provider, display label, and model ID.
+- `[model.operation]`: background work was queued with the selected model key and input sizes.
+- `[model.workflow]`: generation or refinement started/completed with provider, model, job folder,
+  TeX path, and PDF path.
+- `[llm.model_call]`: provider dispatch metadata, including prompt character counts.
+- `[llm.tensorix_request]`: Tensorix model ID, max tokens, timeout, attempts, and JSON-mode flag.
+- `[llm.tensorix_response]`: finish reason, token usage when available, content length, and content
+  hash.
+- `[llm.model_output]`: provider response length and hash after transport parsing.
+- `[llm.parse_ok]` / `[llm.parse_error]`: structured JSON parsing status, top-level keys or safe
+  parse diagnostics, and raw response length/hash.
+
+The logs intentionally avoid raw prompts, API keys, complete model JSON, and generated CV text.
+Hashes are included so repeated failures can be correlated without exposing private content.
 
 ## Claude Interactive Session Behavior
 

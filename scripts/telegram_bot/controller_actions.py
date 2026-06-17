@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from queue import Queue
 
+from scripts.job_creation.model_logging import log_event
+
 from .api import TelegramApi
 from .models import Session, WorkItem
 from .store import StateStore
@@ -59,7 +61,16 @@ def start_queued_refinement(api: TelegramApi, store: StateStore, work: Queue[Wor
     if not feedback:
         return
     session.queued_feedback = ""
-    start(api, store, work, session, "refine", feedback, "Applying queued refinement feedback.")
+    start_refinement(api, store, work, session, feedback, "Applying queued refinement feedback.")
+
+
+def start_refinement(api: TelegramApi, store: StateStore, work: Queue[WorkItem],
+                     session: Session, feedback: str, notice: str = "Refining CV.") -> None:
+    log_event(
+        "model.operation", operation="refine_queued", chat_id=session.chat_id,
+        model_key=session.model_key, feedback_chars=len(feedback),
+    )
+    start(api, store, work, session, "refine", feedback, notice)
 
 
 def retry_pending(api: TelegramApi, store: StateStore, work: Queue[WorkItem],
