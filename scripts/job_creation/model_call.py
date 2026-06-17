@@ -20,15 +20,16 @@ def call_model(system_prompt: str, user_prompt: str, provider: str, model: str) 
             model=model,
             max_tokens=_tensorix_max_tokens(),
             purpose="Tensorix CV model",
+            attempts=_tensorix_attempts(),
         )
     raise IntakeError(f"Unsupported provider: {provider}")
 
 
 def _tensorix_timeout() -> float:
     try:
-        return max(1.0, float(os.environ.get("CV_TENSORIX_TIMEOUT_SECONDS", "120")))
+        return max(1.0, float(os.environ.get("CV_TENSORIX_TIMEOUT_SECONDS", "240")))
     except ValueError:
-        return 120.0
+        return 240.0
 
 
 def _tensorix_max_tokens() -> int:
@@ -36,3 +37,10 @@ def _tensorix_max_tokens() -> int:
         return max(1000, int(os.environ.get("CV_TENSORIX_MAX_TOKENS", "12000")))
     except ValueError:
         return 12000
+
+
+def _tensorix_attempts() -> int:
+    try:
+        return max(1, int(os.environ.get("CV_TENSORIX_ATTEMPTS", "3")))
+    except ValueError:
+        return 3

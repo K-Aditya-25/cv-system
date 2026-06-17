@@ -1,6 +1,7 @@
+import http.client
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from scripts.job_creation.errors import IntakeError
 from scripts.job_creation.tensorix_chat import tensorix_chat
@@ -39,6 +40,18 @@ class TensorixChatTests(unittest.TestCase):
                 urlopen.return_value.__enter__.return_value.read.return_value = json.dumps(response).encode()
                 with self.assertRaisesRegex(IntakeError, "finish_reason=length"):
                     tensorix_chat("system", "user", purpose="Tensorix CV model")
+
+    def test_tensorix_chat_retries_remote_disconnect_when_requested(self):
+        response = {"choices": [{"message": {"content": "ok"}}]}
+        successful = MagicMock()
+        successful.__enter__.return_value.read.return_value = json.dumps(response).encode()
+        with patch("scripts.job_creation.tensorix_chat.get_env_secret", return_value="secret"):
+            with patch("scripts.job_creation.tensorix_chat.time.sleep"):
+                with patch("urllib.request.urlopen") as urlopen:
+                    urlopen.side_effect = [http.client.RemoteDisconnected(), successful]
+                    text = tensorix_chat("system", "user", attempts=2)
+        self.assertEqual(text, "ok")
+        self.assertEqual(urlopen.call_count, 2)
 
 
 if __name__ == "__main__":

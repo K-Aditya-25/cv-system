@@ -208,6 +208,8 @@ CV_ROUTER_MODEL=minimax/minimax-m2.5  # optional default
 CV_GLM_MODEL=z-ai/glm-5.2             # optional CV generation override
 CV_KIMI_MODEL=moonshotai/kimi-k2.6    # optional CV generation override
 CV_TENSORIX_MAX_TOKENS=12000          # optional CV generation output budget
+CV_TENSORIX_TIMEOUT_SECONDS=240       # optional CV generation request timeout
+CV_TENSORIX_ATTEMPTS=3                # optional CV generation retry attempts
 ```
 
 For the macOS Login Service, either keep the key in `.env.local`/`.env` or set it in launchd's user

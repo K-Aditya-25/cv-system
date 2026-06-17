@@ -21,6 +21,7 @@ class ModelProviderPayloadTests(unittest.TestCase):
         self.assertEqual(payload["job_summary_text"], "Target engineer role.")
         self.assertEqual(chat.call_args.kwargs["model"], "z-ai/glm-5.2")
         self.assertEqual(chat.call_args.kwargs["purpose"], "Tensorix CV model")
+        self.assertEqual(chat.call_args.kwargs["attempts"], 3)
 
     def test_model_catalog_resolves_numbered_tensorix_choices(self):
         self.assertEqual(resolve_model_choice("2").key, "glm")
